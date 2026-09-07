@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="1000" viewBox="0 0 1400 1000">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#10162b"/><stop offset=".5" stop-color="#122d4f"/><stop offset="1" stop-color="#080a12"/></linearGradient>
+    <radialGradient id="pink"><stop stop-color="#ff92e2"/><stop offset="1" stop-color="#ed1f7a"/></radialGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="13" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="1400" height="1000" fill="url(#bg)"/>
+  <circle cx="1140" cy="230" r="230" fill="#092b52"/><circle cx="1180" cy="250" r="160" fill="url(#pink)" opacity=".75"/>
+  <path d="M0 730 C260 570 400 840 660 690 S1080 520 1400 710V1000H0Z" fill="#e8f8f8" opacity=".94"/>
+  <g filter="url(#glow)" fill="none" stroke-linecap="round"><path d="M70 235 290 165 420 280 590 105 705 265 940 130" stroke="#31ddea" stroke-width="18"/><path d="M690 560 870 420 995 510 1260 380" stroke="#f2228a" stroke-width="18"/></g>
+  <g transform="translate(90 340) rotate(-3)"><text x="0" y="0" font-family="Arial Black,Arial" font-size="182" font-weight="900" fill="#f5ffff" stroke="#0b1428" stroke-width="18" paint-order="stroke">TRAMA</text><text x="14" y="150" font-family="Arial Black,Arial" font-size="150" font-weight="900" fill="#31ddea" stroke="#0b1428" stroke-width="15" paint-order="stroke">DTF</text></g>
+  <g transform="translate(680 750)"><rect x="0" y="0" width="520" height="110" rx="55" fill="#10162b"/><text x="260" y="72" text-anchor="middle" font-family="Arial" font-size="42" font-weight="700" fill="white">IMPRIME SIN LÍMITES</text></g>
+</svg>
