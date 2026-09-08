@@ -60,3 +60,39 @@ test('additional sharpness leaves flat colors unchanged',()=>{
   const source=image(200,100,50)
   assert.deepEqual(halftone(source,64,64,{...settings,sharpness:100}).data,halftone(source,64,64,settings).data)
 })
+test('solid alpha exports opaque dots and transparent holes',()=>{
+  const result=halftone(image(110,110,110),64,64,{...settings,solidAlpha:true})
+  const alpha=new Set<number>()
+  for(let i=3;i<result.data.length;i+=4)alpha.add(result.data[i])
+  assert.ok(alpha.has(0));assert.ok(alpha.has(255));assert.equal([...alpha].some(a=>a>0&&a<255),false)
+})
+test('fractional alpha remains available when solid alpha is disabled',()=>{
+  const result=halftone(image(110,110,110),64,64,{...settings,solidAlpha:false})
+  const alpha=new Set<number>()
+  for(let i=3;i<result.data.length;i+=4)alpha.add(result.data[i])
+  assert.ok([...alpha].some(a=>a>0&&a<255))
+})
+test('solid alpha handles semitransparent originals with and without screening',()=>{
+ for(const enabled of [true,false]){
+  const data=image(255,0,0,100);data[3]=0
+  const result=halftone(data,64,64,{...settings,enabled,solidAlpha:true})
+  const alpha=Array.from(result.data).filter((_,i)=>i%4===3)
+  assert.ok(alpha.includes(255));assert.ok(alpha.every(a=>a===0||a===255));assert.equal(alpha[0],0)
+ }
+ assert.equal(halftone(image(255,0,0,100),64,64,{...settings,enabled:false,solidAlpha:false}).data[3],100)
+})
+test('rounded corners retain quarter-circle interior instead of cutting squares',()=>{
+ const result=halftone(image(255,255,255),64,64,{...settings,enabled:false,dpi:254,cornerRadiusMm:1})
+ const alpha=(x:number,y:number)=>result.data[(y*64+x)*4+3]
+ assert.equal(alpha(0,0),0);assert.equal(alpha(8,2),255);assert.equal(alpha(32,0),255)
+ for(let y=0;y<64;y++)for(let x=0;x<64;x++){
+  assert.equal(alpha(x,y),alpha(63-x,y));assert.equal(alpha(x,y),alpha(x,63-y))
+ }
+ const count=Array.from(result.data).filter((v,i)=>i%4===3&&v===0).length
+ assert.equal(result.transparent,Math.round(count/4096*100))
+})
+test('radius clamps on small artwork and empty artwork remains empty',()=>{
+ assert.equal(halftone(image(255,255,255,0),64,64,{...settings,cornerRadiusMm:50}).transparent,100)
+ const result=halftone(image(255,255,255),64,64,{...settings,enabled:false,cornerRadiusMm:50})
+ assert.equal(result.data[3],0);assert.equal(result.data[(32*64+32)*4+3],255)
+})

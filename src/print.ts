@@ -42,6 +42,7 @@ function chunks(bytes: Uint8Array) {
 // Canvas normally emits 96 DPI. Write explicit physical resolution without
 // modifying IDAT pixels or the alpha channel, replacing any existing pHYs.
 export function withPngDpi(bytes: Uint8Array, dpi: number) {
+  if(!Number.isFinite(dpi)||dpi<72||dpi>1200) throw new Error('Resolución PNG inválida.')
   const parts = chunks(bytes)
   const chunk = new Uint8Array(21)
   const view = new DataView(chunk.buffer)
@@ -64,12 +65,32 @@ export function withPngDpi(bytes: Uint8Array, dpi: number) {
   return result
 }
 
+// Only for pixels already rendered into an sRGB canvas, not arbitrary source files.
+export function withCanvasPrintProfile(bytes:Uint8Array,dpi:number) {
+  const tagged=withPngDpi(bytes,dpi)
+  const parts=chunks(tagged).filter(p=>!['sRGB','iCCP','gAMA','cHRM','cICP','mDCV','cLLI'].includes(p.type))
+  const srgb=new Uint8Array(13),view=new DataView(srgb.buffer)
+  view.setUint32(0,1);srgb.set([115,82,71,66],4);srgb[8]=0
+  view.setUint32(9,crc32(srgb.subarray(4,9)))
+  const result=new Uint8Array(8+srgb.length+parts.reduce((n,p)=>n+p.end-p.start,0))
+  result.set(tagged.subarray(0,8));let offset=8
+  for(const p of parts){result.set(tagged.subarray(p.start,p.end),offset);offset+=p.end-p.start;if(p.type==='IHDR'){result.set(srgb,offset);offset+=srgb.length}}
+  return result
+}
+
+export function resolutionCheck(item:{naturalWidth:number;naturalHeight:number;widthCm:number;heightCm:number},dpi:number) {
+  const width=Math.round(item.widthCm/2.54*dpi),height=Math.round(item.heightCm/2.54*dpi)
+  return {width,height,effectiveDpi:item.naturalWidth/item.widthCm*2.54,
+    matches:width===item.naturalWidth&&height===item.naturalHeight}
+}
+
 export function inspectPng(bytes: Uint8Array) {
   const parts = chunks(bytes)
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
   const phys = parts.find(p => p.type === 'pHYs')
   return {
     width: view.getUint32(16), height: view.getUint32(20), colorType: bytes[25],
+    profile: parts.some(p=>p.type==='sRGB')?'sRGB':parts.some(p=>p.type==='iCCP')?'ICC':'sin etiqueta',
     dpi: phys && bytes[phys.start + 16] === 1 ? view.getUint32(phys.start + 8) * .0254 : 0,
     dpiY: phys && bytes[phys.start + 16] === 1 ? view.getUint32(phys.start + 12) * .0254 : 0,
   }

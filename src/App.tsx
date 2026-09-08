@@ -1,12 +1,18 @@
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from 'react'
-import { inspectPng, printSize, withPngDpi } from './print'
+import { inspectPng, printSize, withCanvasPrintProfile } from './print'
 import GangSheet from './GangSheet'
+import {clearActiveProject} from './reset-project'
+import type {EditorDocument,GangSource} from './editor-document'
+import {migratePresetSettings} from './preset-migration'
+import {imageContentBounds} from './crop'
+import {createHistory,recordHistory,moveHistory,type History} from './history'
+import CropPanel, {type CropRect} from './CropPanel'
 import { Check, ChevronDown, CircleDot, Download, Hand, Image as ImageIcon, Info, Layers3, Minus, Plus, RotateCcw, SlidersHorizontal, Sparkles, Upload, ZoomIn } from 'lucide-react'
 
 type Shape = 'circle' | 'square' | 'line'
 type ViewMode = 'result' | 'split' | 'original'
 
-type Settings = {
+export type Settings = {
   lpi: number
   angle: number
   shape: Shape
@@ -20,10 +26,20 @@ type Settings = {
   tolerance: number
   enabled: boolean
   featherMm: number
+  cornerRadiusMm: number
   trimMm: number
   edgeSides: boolean[]
   sharpness: number
   gamma: number
+  autoTone: boolean
+  autoContrast: boolean
+  autoColor: boolean
+  autoToneStrength: number
+  autoContrastStrength: number
+  solidAlpha: boolean
+  temperature: number
+  tint: number
+  autoColorStrength: number
 }
 
 const defaults: Settings = {
@@ -40,10 +56,20 @@ const defaults: Settings = {
   tolerance: 25,
   enabled: true,
   featherMm: 0,
+  cornerRadiusMm: 0,
   trimMm: 0,
   edgeSides: [true, true, true, true],
   sharpness: 0,
   gamma: 1,
+  autoTone: false,
+  autoContrast: false,
+  autoColor: false,
+  autoToneStrength: 100,
+  autoContrastStrength: 100,
+  solidAlpha: true,
+  temperature: 0,
+  tint: 0,
+  autoColorStrength: 100,
 }
 
 const presets = {
@@ -51,6 +77,13 @@ const presets = {
   sharp: { label: 'Nitidez', description: 'Trama fina y enfoque moderado para detalles.', values: { lpi: 45, size: 100, contrast: 106, brightness: 100, sharpness: 45, gamma: 1 } },
   gradients: { label: 'Full Gradients', description: 'Más presencia en tonos suaves y transiciones.', values: { lpi: 50, size: 100, contrast: 100, brightness: 100, sharpness: 0, gamma: 1.25 } },
   value: { label: 'Best Value', description: 'Menor cobertura de tinta con una trama abierta.', values: { lpi: 30, size: 82, contrast: 100, brightness: 100, sharpness: 15, gamma: 1 } },
+  monochrome: { label: 'Monocolor', description: 'Salida limpia en un solo color para logos y textos.', values: { lpi: 35, angle: 22.5, shape: 'circle' as Shape, size: 98, contrast: 112, brightness: 100, sharpness: 25, gamma: .92, preserveColor: false, background: 'black' as const, tolerance: 22 } },
+  darkGarment: { label: 'Prenda negra', description: 'Color completo y eliminación de negros de fondo.', values: { lpi: 32, size: 94, contrast: 104, brightness: 102, sharpness: 18, gamma: 1, preserveColor: true, background: 'black' as const, tolerance: 28 } },
+  lightGarment: { label: 'Prenda blanca', description: 'Elimina blancos y conserva transparencias limpias.', values: { lpi: 32, size: 94, contrast: 104, brightness: 100, sharpness: 18, gamma: 1, preserveColor: true, background: 'white' as const, whiteCutoff: 242 } },
+  photo: { label: 'Foto / degradados', description: 'Trama suave para pieles, sombras y degradados fotográficos.', values: { lpi: 42, size: 100, contrast: 96, brightness: 102, sharpness: 12, gamma: 1.3, preserveColor: true, background: 'none' as const } },
+  transparent: { label: 'Transparencia alta', description: 'Puntos abiertos para que respire más la prenda.', values: { lpi: 28, size: 72, contrast: 98, brightness: 100, sharpness: 8, gamma: 1.18 } },
+  lowInk: { label: 'Ahorro de tinta', description: 'Cobertura reducida para bajar consumo y mantener lectura.', values: { lpi: 38, size: 68, contrast: 108, brightness: 100, sharpness: 20, gamma: 1.08 } },
+  softEdge: { label: 'Borde suave', description: 'Desvanecido interior para eliminar marcos rectangulares.', values: { lpi: 30, size: 90, contrast: 100, brightness: 100, sharpness: 10, gamma: 1, featherMm: 2, trimMm: 0.5 } },
 }
 
 const shapeLabels: Record<Shape, string> = { circle: 'Redondo', square: 'Cuadrado', line: 'Línea' }
@@ -61,15 +94,16 @@ function readSavedPresets(): SavedPreset[] {
   try {
     const data: unknown = JSON.parse(localStorage.getItem(presetStorageKey) || '[]')
     if (!Array.isArray(data)) return []
-    return data.filter((p): p is SavedPreset => {
+    return data.map(p=>p && typeof p==='object' && p.settings && typeof p.settings==='object'?{...p,settings:migratePresetSettings(p.settings,defaults)}:p).filter((p): p is SavedPreset => {
       if (!p || typeof p.id !== 'string' || !p.id.startsWith('saved:') || typeof p.name !== 'string' || !p.name.trim() || !p.settings) return false
       const s = p.settings
-      const ranges = {lpi:[12,65],angle:[0,90],size:[45,125],contrast:[50,180],brightness:[60,140],whiteCutoff:[170,255],tolerance:[0,100],featherMm:[0,30],trimMm:[0,15],sharpness:[0,100],gamma:[.5,2]}
+      const ranges = {lpi:[12,65],angle:[0,90],size:[45,125],contrast:[50,180],brightness:[60,140],whiteCutoff:[170,255],tolerance:[0,100],featherMm:[0,30],trimMm:[0,15],cornerRadiusMm:[0,50],sharpness:[0,100],gamma:[.5,2],temperature:[-100,100],tint:[-100,100],autoColorStrength:[0,100],autoToneStrength:[0,100],autoContrastStrength:[0,100]}
       return Object.entries(ranges).every(([key,[min,max]]) => Number.isFinite(s[key]) && s[key] >= min && s[key] <= max)
         && ['circle','square','line'].includes(s.shape) && ['black','white','none'].includes(s.background)
         && ['enabled','preserveColor','invert'].every(key => typeof s[key] === 'boolean')
+        && ['autoTone','autoContrast','autoColor','solidAlpha'].every(key => s[key] === undefined || typeof s[key] === 'boolean')
         && Array.isArray(s.edgeSides) && s.edgeSides.length === 4 && s.edgeSides.every((v:unknown) => typeof v === 'boolean')
-    })
+    }).map(p=>({...p,settings:{...defaults,...p.settings}}))
   } catch {return []}
 }
 
@@ -87,7 +121,10 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
   return <button type="button" className={`toggle ${checked ? 'on' : ''}`} aria-pressed={checked} onClick={() => onChange(!checked)}><span /></button>
 }
 
-function App() {
+function App({onNewProject}:{onNewProject:()=>void}) {
+  const [crop,setCrop]=useState<CropRect|null>(null)
+  const [showCrop,setShowCrop]=useState(false)
+  const [prepressCollapsed,setPrepressCollapsed]=useState(false)
   const sourceCanvas = useRef<HTMLCanvasElement>(null)
   const resultCanvas = useRef<HTMLCanvasElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
@@ -110,23 +147,46 @@ function App() {
   const [presetName, setPresetName] = useState('')
   const [presetMessage, setPresetMessage] = useState('')
   const [showInfo, setShowInfo] = useState(false)
-  const [gangSource, setGangSource] = useState<{ id: number; blob: Blob; widthCm: number; name: string }>()
+  const [gangSource, setGangSource] = useState<GangSource>()
+  const [editingAssetId,setEditingAssetId]=useState<string>()
   const [split, setSplit] = useState(52)
-  const [fileName, setFileName] = useState('demo-trama-dtf.svg')
+  const [fileName, setFileName] = useState('')
   const [dimensions, setDimensions] = useState({ width: 1400, height: 1000 })
   const [dragging, setDragging] = useState(false)
   const [widthCm, setWidthCm] = useState('11.8533')
   const [dpi, setDpi] = useState(300)
   const [imageVersion, setImageVersion] = useState(0)
   const [readyKey, setReadyKey] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [exportMessage, setExportMessage] = useState('')
   const [transparent, setTransparent] = useState(0)
   const [previewBg, setPreviewBg] = useState('checker')
   const [error, setError] = useState('')
   const loadId = useRef(0)
-  const [activePanel, setActivePanel] = useState<'trama' | 'ajustes'>('trama')
+  const [collapsedPanels, setCollapsedPanels] = useState({presets:false, size:false, background:false, trama:false, ajustes:false, edges:false})
+  const [displaySize,setDisplaySize]=useState<{width:number;height:number}|null>(null)
+  type Snapshot = {settings:Settings;widthCm:string;dpi:number;crop:CropRect|null;dimensions:{width:number;height:number}}
+  const history=useRef<History<Snapshot>|null>(null)
+  const historyImage=useRef(-1)
+  const gesture=useRef(0)
+  const [historyCounts,setHistoryCounts]=useState({undo:0,redo:0})
+  useEffect(()=>{
+    if(loading)return
+    const snapshot={settings,widthCm,dpi,crop,dimensions}
+    if(!history.current || historyImage.current!==imageVersion){history.current=createHistory(snapshot);historyImage.current=imageVersion}
+    else history.current=recordHistory(history.current,snapshot,gesture.current)
+    setHistoryCounts({undo:history.current.past.length,redo:history.current.future.length})
+  },[settings,widthCm,dpi,crop,dimensions,imageVersion,loading])
+  const navigateHistory=(direction:'undo'|'redo')=>{
+    if(!history.current || loading)return
+    const next=moveHistory(history.current,direction)
+    if(next===history.current)return
+    history.current=next;gesture.current++
+    const s=next.present
+    setSettings(s.settings);setWidthCm(s.widthCm);setDpi(s.dpi);setCrop(s.crop);setDimensions(s.dimensions);setPreset('custom')
+    setHistoryCounts({undo:next.past.length,redo:next.future.length})
+  }
 
   useEffect(() => {
     const clear = () => {
@@ -181,7 +241,7 @@ function App() {
     return () => observer.disconnect()
   }, [])
 
-  const update = <K extends keyof Settings>(key: K, value: Settings[K]) => { setPreset('custom'); setSettings((s) => ({ ...s, [key]: value })) }
+  const update = <K extends keyof Settings>(key: K, value: Settings[K]) => { if (key === 'autoTone' || key === 'autoToneStrength' || key === 'autoContrast' || key === 'autoContrastStrength' || key === 'autoColor' || key === 'autoColorStrength') setView('result'); setPreset('custom'); setSettings((s) => ({ ...s, [key]: value })) }
 
   const savePreset = () => {
     const baseName = presetName.trim().slice(0, 60)
@@ -203,14 +263,15 @@ function App() {
   const ratio = dimensions.width / dimensions.height
   let output: ReturnType<typeof printSize> | undefined
   let sizeError = ''
-  try { output = printSize(Number(widthCm), ratio, dpi) } catch (e) { sizeError = (e as Error).message }
-  const renderKey = JSON.stringify([imageVersion, output?.width, output?.height, dpi, settings])
+  try { if(fileName) output = printSize(Number(widthCm), ratio, dpi) } catch (e) { sizeError = (e as Error).message }
+  const renderKey = JSON.stringify([imageVersion, output?.width, output?.height, dpi, settings,crop])
   const processing = loading || (!!output && readyKey !== renderKey && !error)
-  const previewScale = fit ? Math.min((viewport.width - 48) / (output?.width || dimensions.width), (viewport.height - 48) / (output?.height || dimensions.height), 1) : zoom / 100
+  const visibleSize=displaySize ?? dimensions
+  const previewScale = fit ? Math.min((viewport.width - 48) / visibleSize.width, (viewport.height - 48) / visibleSize.height, 1) : zoom / 100
   const shownZoom = Math.max(1, Math.round(previewScale * 100))
   const changeZoom = (factor: number) => { setZoom(Math.max(5, Math.min(400, Math.round(shownZoom * factor)))); setFit(false) }
 
-  const loadImage = (src: string, name: string) => {
+  const loadImage = (src: string, name: string, sourceDpi=300, physicalWidth?:number, document?:EditorDocument,assetId?:string) => {
     const id = ++loadId.current
     setLoading(true)
     const img = new Image()
@@ -219,9 +280,13 @@ function App() {
       if (id !== loadId.current) return
       if (!img.naturalWidth || !img.naturalHeight) { setError('La imagen no tiene dimensiones válidas.'); setLoading(false); return }
       imageRef.current = img
-      setDimensions({ width: img.naturalWidth, height: img.naturalHeight })
-      setWidthCm((img.naturalWidth / 300 * 2.54).toFixed(4))
-      setDpi(300)
+      setCrop(document?.crop ?? null)
+      setEditingAssetId(assetId)
+      if(document){setSettings({...document.settings,edgeSides:[...document.settings.edgeSides]});setPreset('custom')}
+      setShowCrop(false)
+      setDimensions({ width: document?.crop?.width ?? img.naturalWidth, height: document?.crop?.height ?? img.naturalHeight })
+      setWidthCm((physicalWidth ?? img.naturalWidth / sourceDpi * 2.54).toFixed(4))
+      setDpi(sourceDpi)
       setFileName(name)
       setError('')
       setExportMessage('')
@@ -233,7 +298,7 @@ function App() {
     img.src = src
   }
 
-  useEffect(() => { loadImage('/sample.svg', 'demo-trama-dtf.svg'); return () => { loadId.current++ } }, [])
+  useEffect(() => () => { loadId.current++ }, [])
   useEffect(() => {
     if (!imageRef.current || !output || loading) return
     let cancelled = false
@@ -244,39 +309,71 @@ function App() {
     const timer = setTimeout(() => {
       try {
         const src = sourceCanvas.current!, out = resultCanvas.current!
-        src.width = out.width = width
-        src.height = out.height = height
         const native = document.createElement('canvas')
         native.width = imageRef.current!.naturalWidth
         native.height = imageRef.current!.naturalHeight
         const ctx = native.getContext('2d', { willReadFrequently: true })!
         ctx.drawImage(imageRef.current!, 0, 0)
-        const input = ctx.getImageData(0, 0, native.width, native.height)
+        const input = ctx.getImageData(crop?.x ?? 0, crop?.y ?? 0, crop?.width ?? native.width, crop?.height ?? native.height)
         worker = new Worker(new URL('./halftone.worker.ts', import.meta.url), { type: 'module' })
         worker.onmessage = ({ data }) => {
           if (cancelled) return
           if (data.error) setError(data.error)
           else {
-            src.getContext('2d')!.putImageData(new ImageData(data.original, width, height), 0, 0)
-            out.getContext('2d')!.putImageData(new ImageData(data.data, width, height), 0, 0)
+            // Resize only when the replacement is ready: resizing clears canvas pixels.
+            const originalPixels=new ImageData(data.original,width,height)
+            const resultPixels=new ImageData(data.data,width,height)
+            src.width = out.width = width
+            src.height = out.height = height
+            src.getContext('2d')!.putImageData(originalPixels, 0, 0)
+            out.getContext('2d')!.putImageData(resultPixels, 0, 0)
+            setDisplaySize({width,height})
             setTransparent(data.transparent)
             setReadyKey(renderKey)
           }
           worker?.terminate()
         }
         worker.onerror = () => { if (!cancelled) setError('No se pudo procesar. Reduce el tamaño e inténtalo nuevamente.'); worker?.terminate() }
-        worker.postMessage({ data: input.data, width, height, sourceWidth: native.width, sourceHeight: native.height, settings: { ...settings, dpi } }, [input.data.buffer])
+        worker.postMessage({ data: input.data, width, height, sourceWidth: input.width, sourceHeight: input.height, settings: { ...settings, dpi } }, [input.data.buffer])
         native.width = native.height = 1
       } catch (e) { if (!cancelled) setError((e as Error).message) }
     }, 120)
     return () => { cancelled = true; clearTimeout(timer); worker?.terminate() }
   }, [renderKey, loading])
 
-  const handleFile = (file?: File) => {
+  const handleFile = async (file?: File, print?:{widthCm:number;dpi:number}) => {
     if (!file) return
     if (!file.type.startsWith('image/')) { setError('Selecciona una imagen PNG, JPG, WebP o SVG.'); return }
-    const url = URL.createObjectURL(file)
-    loadImage(url, file.name)
+    const request=++loadId.current
+    setLoading(true)
+    let sourceDpi=300
+    try {
+      if(file.type==='image/png'){
+        const info=inspectPng(new Uint8Array(await file.arrayBuffer()))
+        sourceDpi=[150,300,600].find(value=>Math.abs(info.dpi-value)<.02&&Math.abs(info.dpiY-value)<.02) ?? 300
+      }
+      if(request!==loadId.current)return
+      loadImage(URL.createObjectURL(file), file.name, print?.dpi ?? sourceDpi,print?.widthCm)
+    } catch(e){if(request===loadId.current){setLoading(false);setError((e as Error).message)}}
+  }
+
+  const requestImport = (file?: File) => {
+    if (!file) return
+    handleFile(file)
+    setTool('design')
+  }
+
+  const trimToContent=()=>{
+    const image=imageRef.current
+    if(!image || loading)return
+    try {
+      const area=crop ?? {x:0,y:0,width:image.naturalWidth,height:image.naturalHeight}
+      const bounds=imageContentBounds(image,area)
+      if(!bounds){setExportMessage('La imagen no contiene píxeles visibles. No se aplicó ningún recorte.');return}
+      if(bounds.width===area.width && bounds.height===area.height){setExportMessage('No hay márgenes transparentes que recortar. Los fondos opacos cuentan como contenido.');return}
+      setWidthCm((Number(widthCm)*bounds.width/dimensions.width).toFixed(4))
+      setDimensions({width:bounds.width,height:bounds.height});setCrop(bounds);setFit(true)
+    } catch(e){setError(e instanceof Error?e.message:'No se pudo detectar el contenido.')}
   }
 
   const exportPng = async () => {
@@ -286,9 +383,9 @@ function App() {
     setExportMessage('')
     try {
       const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('No se pudo generar el PNG.')), 'image/png'))
-      const bytes = withPngDpi(new Uint8Array(await blob.arrayBuffer()), dpi)
+      const bytes = withCanvasPrintProfile(new Uint8Array(await blob.arrayBuffer()), dpi)
       const metadata = inspectPng(bytes)
-      if (metadata.width !== output.width || metadata.height !== output.height || Math.abs(metadata.dpi - dpi) > .02 || Math.abs(metadata.dpiY - dpi) > .02) throw new Error('El PNG no coincide con el tamaño solicitado.')
+      if (metadata.width !== output.width || metadata.height !== output.height || Math.abs(metadata.dpi - dpi) > .02 || Math.abs(metadata.dpiY - dpi) > .02 || metadata.profile !== 'sRGB') throw new Error('El PNG no coincide con el tamaño solicitado.')
       const url = URL.createObjectURL(new Blob([bytes], { type: 'image/png' }))
       const link = document.createElement('a')
       link.download = `${fileName.replace(/\.[^.]+$/, '')}-${output.width}x${output.height}-${dpi}ppp.png`
@@ -302,34 +399,70 @@ function App() {
     finally { setExporting(false) }
   }
 
+  const snapshotEditor = () => {
+    if(loading)throw new Error('Espera a que termine de cargar la imagen antes de guardar.')
+    if(!imageRef.current)return undefined
+    const native=document.createElement('canvas')
+    native.width=imageRef.current.naturalWidth;native.height=imageRef.current.naturalHeight
+    native.getContext('2d',{colorSpace:'srgb'})!.drawImage(imageRef.current,0,0)
+    const doc:EditorDocument={version:1,original:native.toDataURL('image/png'),settings:structuredClone(settings),crop:crop?{...crop}:null,widthCm:Number(widthCm),dpi}
+    native.width=native.height=1
+    return {name:fileName,document:doc,assetId:editingAssetId}
+  }
+  const restoreProjectEditor = (editor:{name:string;document:EditorDocument;assetId?:string}|undefined) => {
+    setGangSource(undefined)
+    if(editor){loadImage(editor.document.original,editor.name,editor.document.dpi,editor.document.widthCm,editor.document,editor.assetId)}
+    else {loadId.current++;imageRef.current=null;setImageVersion(v=>v+1);setFileName('');setEditingAssetId(undefined);setCrop(null);setLoading(false);setDisplaySize(null);setReadyKey('')}
+  }
   const sendToGang = () => {
-    if (!output || readyKey !== renderKey || loading) return
+    if (!output || readyKey !== renderKey || loading || exporting || !imageRef.current) return
     const name = fileName
     const width = output.widthCm
-    resultCanvas.current?.toBlob(blob => {
-      if (blob) { setGangSource({id: Date.now(), blob, widthCm: width, name}); setTool('gang') }
+    const sourceDpi=dpi
+    const native=document.createElement('canvas')
+    native.width=imageRef.current.naturalWidth;native.height=imageRef.current.naturalHeight
+    native.getContext('2d',{colorSpace:'srgb'})!.drawImage(imageRef.current,0,0)
+    const editorDocument:EditorDocument={version:1,original:native.toDataURL('image/png'),settings:structuredClone(settings),crop:crop?{...crop}:null,widthCm:width,dpi:sourceDpi}
+    native.width=native.height=1
+    const replaceId=editingAssetId
+    setExporting(true)
+    resultCanvas.current?.toBlob(async blob => {
+      try {if(!blob)throw new Error('No se pudo generar el diseño.');const tagged=new Blob([withCanvasPrintProfile(new Uint8Array(await blob.arrayBuffer()),sourceDpi)],{type:'image/png'});setGangSource({id: Date.now(), blob:tagged, widthCm: width, name,document:editorDocument,replaceId});setTool('gang')}
+      catch(e){setError((e as Error).message)}finally{setExporting(false)}
     }, 'image/png')
   }
 
+  const editGangDocument = (document:EditorDocument,name:string,id:string) => {
+    loadImage(document.original,name,document.dpi,document.widthCm,document,id)
+    setTool('design')
+  }
+
   return (
-    <div className="app-shell">
+    <div className="app-shell" onPointerDownCapture={()=>{gesture.current++}} onKeyDownCapture={e=>{
+      if(!e.repeat)gesture.current++
+      if(tool!=='design' || showCrop || !(e.metaKey||e.ctrlKey))return
+      if(e.target instanceof Element && e.target.closest('input,textarea,select,[contenteditable=true]'))return
+      if(e.key.toLowerCase()==='z'){e.preventDefault();navigateHistory(e.shiftKey?'redo':'undo')}
+      else if(e.key.toLowerCase()==='y'){e.preventDefault();navigateHistory('redo')}
+    }}>
       <header className="topbar">
         <div className="brand"><div className="brand-mark"><CircleDot size={23} /><i /></div><span>TRAMA</span><small>DTF LAB</small></div>
-        <div className="file-pill"><span className="status-dot" /> <span>{fileName}</span><small>{dimensions.width} × {dimensions.height} px</small></div>
+        <div className="file-pill">{fileName && <><span className="status-dot" /> <span>{fileName}</span><small>{dimensions.width} × {dimensions.height} px</small></>}</div>
         <div className="top-actions">
-          {tool === 'design' && <button className="btn ghost" onClick={() => {setSettings(defaults); setPreset('default')}}><RotateCcw size={17} /> Restablecer</button>}
-          {tool === 'design' && <><button className="btn gang-send" title="Añadir el diseño procesado y abrir la plancha" disabled={processing || !output || readyKey !== renderKey} onClick={sendToGang}><Layers3 size={16}/><span>Enviar a Gang Sheet</span></button><button className="btn export" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={exportPng}><Download size={17} /> {exporting ? 'Exportando…' : 'Exportar PNG'}</button></>}
+          <button className="btn ghost" disabled={exporting} onClick={onNewProject} title="Vaciar el editor y el Gang Sheet y comenzar desde cero">Nuevo proyecto</button>
+          {fileName && tool === 'design' && <button className="btn ghost" onClick={() => {setSettings(defaults); setPreset('default')}}><RotateCcw size={17} /> Restablecer ajustes</button>}
+          {fileName && tool === 'design' && <><button className="btn gang-send" title="Añadir el diseño procesado y abrir la plancha" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={sendToGang}><Layers3 size={16}/><span>{editingAssetId?'Actualizar en Gang Sheet':'Enviar a Gang Sheet'}</span></button><button className="btn export" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={exportPng}><Download size={17} /> {exporting ? 'Exportando…' : 'Exportar PNG'}</button></>}
         </div>
       </header>
 
       <nav className="tool-tabs"><button className={tool === 'design' ? 'active' : ''} onClick={() => setTool('design')}>Editor de semitonos</button><button className={tool === 'gang' ? 'active' : ''} onClick={() => setTool('gang')}>Gang Sheet</button><span>Todo se procesa en tu equipo</span></nav>
-      <div style={{display: tool === 'gang' ? 'block' : 'none'}}><GangSheet source={gangSource} /></div>
-      <main className="workspace" style={{display: tool === 'design' ? undefined : 'none'}}>
-        <aside className="sidebar">
+      <div style={{display: tool === 'gang' ? 'block' : 'none'}}><GangSheet source={gangSource} onImportFile={requestImport} onEditDocument={editGangDocument} previewColor={previewBg} onPreviewColorChange={setPreviewBg} getEditor={snapshotEditor} restoreEditor={restoreProjectEditor}/></div>
+      <main className={`workspace ${prepressCollapsed || !fileName ? 'prepress-collapsed' : ''} ${!fileName ? 'empty-editor' : ''}`} style={{display: tool === 'design' ? undefined : 'none'}}>
+        <aside className="sidebar" id="prepress-panel" hidden={prepressCollapsed || !fileName}>
           <div className="sidebar-title"><div><Sparkles size={18} /><span>Pre-prensa</span></div><button aria-label="Información" aria-expanded={showInfo} onClick={() => setShowInfo(v => !v)}><Info size={17} /></button></div>
           {showInfo && <div className="tip-card"><p>1. Carga tu imagen y define tamaño y ppp. 2. Elige el fondo a eliminar, preset y bordes. 3. Revisa al 100% y sobre la prenda. 4. Exporta PNG o añade a una plancha. El tamaño se graba en el PNG; comprueba que tu RIP respete los centímetros indicados.</p></div>}
 
-          <section className="control-card open"><div className="section-heading"><span>Presets</span></div><div className="section-body">
+          <section className={`control-card ${collapsedPanels.presets ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.presets} aria-controls="preset-controls" onClick={()=>setCollapsedPanels(s=>({...s,presets:!s.presets}))}><span>Presets</span><ChevronDown size={17}/></button><div className="section-body" id="preset-controls" hidden={collapsedPanels.presets}>
             <select aria-label="Preset" value={preset} onChange={e => {
               const key = e.target.value
               const saved = savedPresets.find(p => p.id === key)
@@ -343,11 +476,15 @@ function App() {
             {presetMessage && <p className="help-text" role="status">{presetMessage}</p>}
           </div></section>
 
-          <section className="control-card open"><div className="section-heading"><span>Tamaño de impresión</span></div><div className="section-body">
+          <section className={`control-card ${collapsedPanels.size ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.size} aria-controls="size-controls" onClick={()=>setCollapsedPanels(s=>({...s,size:!s.size}))}><span>Tamaño de impresión</span><ChevronDown size={17}/></button><div className="section-body" id="size-controls" hidden={collapsedPanels.size}>
+            <button className="btn" disabled={loading} onClick={()=>setShowCrop(true)}>Recortar imagen (Crop)</button>
+            <button className="btn" disabled={loading||!fileName||!output} onClick={trimToContent}>Recortar al contenido</button>
+            <p className="help-text">Quita márgenes transparentes del original, sin ampliar el diseño. Conserva los huecos internos. Puedes deshacer el recorte.</p>
             <label className="field">Escala del original (%)<input aria-label="Escala del original en porcentaje" type="number" min="1" max="2000" step="25" value={widthCm && Number(widthCm) > 0 ? Number((Number(widthCm) / 2.54 * dpi / dimensions.width * 100).toFixed(1)) : ''} onChange={e => setWidthCm(e.target.value ? (dimensions.width * Number(e.target.value) / 100 / dpi * 2.54).toFixed(4) : '')} /></label>
             <div className="scale-presets">{[100,200,300,400].map(percent => <button key={percent} onClick={() => setWidthCm((dimensions.width * percent / 100 / dpi * 2.54).toFixed(4))}>{percent}%</button>)}</div>
             <div className="dimension-fields"><label>Ancho (cm)<input aria-label="Ancho en centímetros" type="number" min="0.1" step="0.1" value={widthCm} onChange={e => setWidthCm(e.target.value)} /></label><label>Alto (cm)<input aria-label="Alto en centímetros" type="number" min="0.1" step="0.1" value={widthCm && Number(widthCm) > 0 ? (Number(widthCm) / ratio).toFixed(2) : ''} onChange={e => setWidthCm(e.target.value ? String(Number(e.target.value) * ratio) : '')} /></label></div>
             <label className="field">Resolución<select aria-label="Resolución de impresión" value={dpi} onChange={e => setDpi(Number(e.target.value))}><option value="150">150 ppp</option><option value="300">300 ppp</option><option value="600">600 ppp</option></select></label>
+            <p className="help-text">Salida PNG sRGB, 8 bits por canal. Comprueba los ppp requeridos por tu RIP. Aumentarlos no recupera detalle del original.</p>
             <p className="help-text">Proporciones bloqueadas. {output ? `${output.width} × ${output.height} px de salida.` : ''}</p>
             <p className="help-text">Ampliación Lanczos · La trama se genera después de escalar.</p>
             <RangeControl label="Nitidez adicional" value={settings.sharpness} min={0} max={100} unit="%" onChange={v => update('sharpness', v)} />
@@ -355,15 +492,15 @@ function App() {
             {sizeError && <p className="error-text" role="alert">{sizeError}</p>}
           </div></section>
 
-          <section className="control-card open"><div className="section-heading"><span>Eliminar fondo</span></div><div className="section-body">
+          <section className={`control-card ${collapsedPanels.background ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.background} aria-controls="background-controls" onClick={()=>setCollapsedPanels(s=>({...s,background:!s.background}))}><span>Eliminar fondo</span><ChevronDown size={17}/></button><div className="section-body" id="background-controls" hidden={collapsedPanels.background}>
             <div className="segmented"><button className={settings.background === 'black' ? 'active' : ''} onClick={() => update('background', 'black')}>Negro</button><button className={settings.background === 'white' ? 'active' : ''} onClick={() => update('background', 'white')}>Blanco</button><button className={settings.background === 'none' ? 'active' : ''} onClick={() => update('background', 'none')}>Ninguno</button></div>
             {settings.background === 'black' && <RangeControl label="Eliminar sombras" value={settings.tolerance} min={0} max={100} onChange={(v) => update('tolerance', v)} />}
             {settings.background === 'white' && <RangeControl label="Umbral de blancos" value={settings.whiteCutoff} min={170} max={255} onChange={(v) => update('whiteCutoff', v)} />}
           </div></section>
 
-          <section className={`control-card ${activePanel === 'trama' ? 'open' : ''}`}>
-            <button className="section-heading" onClick={() => setActivePanel('trama')}><span><CircleDot size={17} /> Semitono</span><ChevronDown size={17} /></button>
-            {activePanel === 'trama' && <div className="section-body">
+          <section className={`control-card ${collapsedPanels.trama ? '' : 'open'}`}>
+            <button className="section-heading" aria-expanded={!collapsedPanels.trama} aria-controls="trama-controls" onClick={() => setCollapsedPanels(s=>({...s,trama:!s.trama}))}><span><CircleDot size={17} /> Semitono</span><ChevronDown size={17} /></button>
+            <div className="section-body" id="trama-controls" hidden={collapsedPanels.trama}>
               <div className="row-label"><span>Activar semitono</span><Toggle checked={settings.enabled} onChange={(v) => update('enabled', v)} /></div>
               <RangeControl label="Frecuencia" value={settings.lpi} min={12} max={65} unit=" LPI" onChange={(v) => update('lpi', v)} />
               <RangeControl label="Ángulo" value={settings.angle} min={0} max={90} step={0.5} unit="°" onChange={(v) => update('angle', v)} />
@@ -371,25 +508,42 @@ function App() {
                 {(['circle', 'square', 'line'] as Shape[]).map((shape) => <button key={shape} className={settings.shape === shape ? 'active' : ''} onClick={() => update('shape', shape)}><i className={`shape-${shape}`} />{shapeLabels[shape]}</button>)}
               </div></div>
               <RangeControl label="Tamaño máximo" value={settings.size} min={45} max={125} unit="%" onChange={(v) => update('size', v)} />
-            </div>}
+            </div>
           </section>
 
-          <section className={`control-card ${activePanel === 'ajustes' ? 'open' : ''}`}>
-            <button className="section-heading" onClick={() => setActivePanel('ajustes')}><span><SlidersHorizontal size={17} /> Ajustes de imagen</span><ChevronDown size={17} /></button>
-            {activePanel === 'ajustes' && <div className="section-body">
+          <section className={`control-card ${collapsedPanels.ajustes ? '' : 'open'}`}>
+            <button className="section-heading" aria-expanded={!collapsedPanels.ajustes} aria-controls="image-controls" onClick={() => setCollapsedPanels(s=>({...s,ajustes:!s.ajustes}))}><span><SlidersHorizontal size={17} /> Ajustes de imagen</span><ChevronDown size={17} /></button>
+            <div className="section-body" id="image-controls" hidden={collapsedPanels.ajustes}>
+              <div className="auto-adjustments">
+                <span className="field">Correcciones automáticas</span>
+                {([['autoTone','Tono automático','Amplía el rango de cada canal de color.'],['autoContrast','Contraste automático','Amplía el rango con el mismo ajuste para los tres canales.'],['autoColor','Color automático','Reduce dominantes usando los tonos casi neutros.']] as const).map(([key,label,description]) => <button key={key} className={`auto-adjust-button ${settings[key] ? 'active' : ''}`} type="button" aria-pressed={settings[key]} title={description} onClick={()=>update(key,!settings[key])}><Sparkles size={14}/><span>{label}</span>{settings[key] && <Check size={14}/>}</button>)}
+                <p className="help-text">Pulsa para activar o desactivar. Puedes combinarlas; se calculan desde el original antes de la trama y se incluyen al guardar un preset.</p>
+              </div>
+              <RangeControl label="Intensidad tono automático" value={settings.autoToneStrength} min={0} max={100} unit="%" onChange={v => update('autoToneStrength', v)} />
+              <RangeControl label="Intensidad contraste automático" value={settings.autoContrastStrength} min={0} max={100} unit="%" onChange={v => update('autoContrastStrength', v)} />
+              <p className="help-text">0% conserva el tono original; 100% aplica toda la corrección automática.</p>
               <RangeControl label="Contraste" value={settings.contrast} min={50} max={180} unit="%" onChange={(v) => update('contrast', v)} />
               <RangeControl label="Brillo" value={settings.brightness} min={60} max={140} unit="%" onChange={(v) => update('brightness', v)} />
               <RangeControl label="Degradados (gamma)" value={settings.gamma} min={0.5} max={2} step={0.05} onChange={v => update('gamma', v)} />
+              <div className="row-label"><span>Alfa sólido (DTF)</span><Toggle checked={settings.solidAlpha} onChange={v => update('solidAlpha', v)} /></div>
+              <p className="help-text">Cada punto exportado es opaco; los huecos permanecen transparentes. Desactívalo para conservar alfa parcial.</p>
+              <div className="white-balance-title"><span>Balance de blancos</span><button className="text-button" onClick={()=>{update('temperature',0);update('tint',0);update('autoColorStrength',100)}}>Reiniciar</button></div>
+              <RangeControl label="Temperatura" value={settings.temperature} min={-100} max={100} onChange={v => update('temperature', v)} />
+              <RangeControl label="Tinte magenta / verde" value={settings.tint} min={-100} max={100} onChange={v => update('tint', v)} />
+              <RangeControl label="Fuerza color automático" value={settings.autoColorStrength} min={0} max={100} unit="%" onChange={v => update('autoColorStrength', v)} />
+              <p className="help-text">Temperatura negativa enfría hacia azul; positiva calienta hacia amarillo. Tinte negativo va a verde; positivo a magenta.</p>
               <div className="row-label"><span>Conservar color</span><Toggle checked={settings.preserveColor} onChange={(v) => update('preserveColor', v)} /></div>
               <div className="row-label"><span>Invertir trama</span><Toggle checked={settings.invert} onChange={(v) => update('invert', v)} /></div>
-            </div>}
+            </div>
           </section>
 
-          <section className="control-card open"><div className="section-heading"><span>Suavizar bordes</span><button className="text-button" onClick={() => setSettings(s => ({...s, featherMm: 0, trimMm: 0, edgeSides: [true,true,true,true]}))}>Reiniciar</button></div><div className="section-body">
+          <section className={`control-card ${collapsedPanels.edges ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.edges} aria-controls="edge-controls" onClick={()=>setCollapsedPanels(s=>({...s,edges:!s.edges}))}><span>Suavizar bordes</span><ChevronDown size={17}/></button><div className="section-body" id="edge-controls" hidden={collapsedPanels.edges}>
+            <button className="text-button" onClick={() => setSettings(s => ({...s, featherMm: 0, trimMm: 0, cornerRadiusMm: 0, edgeSides: [true,true,true,true]}))}>Reiniciar bordes</button>
             <RangeControl label="Borrar margen" value={settings.trimMm} min={0} max={15} step={0.5} unit=" mm" onChange={v => update('trimMm', v)} />
             <RangeControl label="Desvanecido hacia dentro" value={settings.featherMm} min={0} max={30} step={0.5} unit=" mm" onChange={v => update('featherMm', v)} />
+            <RangeControl label="Radio de esquinas" value={settings.cornerRadiusMm} min={0} max={50} step={0.5} unit=" mm" onChange={v => update('cornerRadiusMm', v)} />
             <div className="edge-sides">{['Arriba', 'Derecha', 'Abajo', 'Izquierda'].map((label, index) => <label key={label}><input type="checkbox" checked={settings.edgeSides[index]} onChange={e => update('edgeSides', settings.edgeSides.map((v, i) => i === index ? e.target.checked : v))} />{label}</label>)}</div>
-            <p className="help-text">Borra el contorno rectangular en los lados elegidos. El desvanecido se convierte en puntos para DTF; conserva el tamaño del lienzo.</p>
+            <p className="help-text">Borra el contorno rectangular, suaviza los lados y permite redondear las cuatro esquinas. El tamaño del lienzo se conserva.</p>
           </div></section>
           <div className="tip-card"><div><Check size={14} /> {processing ? 'ACTUALIZANDO…' : `${transparent}% TRANSPARENTE`}</div><p>{settings.background === 'black' ? 'El negro lo aporta la prenda. Se eliminan los tonos oscuros del diseño completo.' : settings.background === 'white' ? 'Se eliminan los blancos del diseño completo.' : 'Se conserva el color y se perfora con la trama.'} El fondo de vista previa no se exporta.</p></div>
           {error && <p className="error-text" role="alert">{error}</p>}
@@ -397,19 +551,25 @@ function App() {
         </aside>
 
         <section className={`stage ${dragging ? 'dragging' : ''}`} onDragOver={(e) => { e.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)} onDrop={(e) => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]) }}>
-          <div className="stage-toolbar">
+          <div className="stage-toolbar" hidden={!fileName}>
+            <button className="btn prepress-toggle" aria-expanded={!prepressCollapsed} aria-controls="prepress-panel" onClick={()=>setPrepressCollapsed(v=>!v)} title={prepressCollapsed?'Mostrar controles de Pre-prensa':'Ocultar controles de Pre-prensa'}><SlidersHorizontal size={15}/>{prepressCollapsed?'Mostrar Pre-prensa':'Ocultar Pre-prensa'}</button>
+            <div className="history-controls" role="group" aria-label="Historial de ajustes">
+              <button className="btn" disabled={loading||!historyCounts.undo} onClick={()=>navigateHistory('undo')} title="Deshacer (⌘/Ctrl Z)">↶ Deshacer</button>
+              <button className="btn" disabled={loading||!historyCounts.redo} onClick={()=>navigateHistory('redo')} title="Rehacer (⌘/Ctrl Shift Z)">↷ Rehacer</button>
+            </div>
             <div className="view-switch">
               <button className={view === 'original' ? 'active' : ''} onClick={() => setView('original')}><ImageIcon size={15} /> Original</button>
               <button className={view === 'split' ? 'active' : ''} onClick={() => setView('split')}><Layers3 size={15} /> Comparar</button>
               <button className={view === 'result' ? 'active' : ''} onClick={() => setView('result')}><CircleDot size={15} /> Resultado</button>
             </div>
+            <div className="preview-background"><span>Vista sobre</span><select aria-label="Fondo de vista previa" value={previewBg} onChange={(e) => setPreviewBg(e.target.value)}><option value="checker">Transparencia</option><option value="black">Prenda negra</option><option value="white">Prenda blanca</option><option value="#596778">Prenda gris</option><option value="#304b70">Prenda azul marino</option><option value="#7b2931">Prenda roja</option></select></div>
             <button className="upload-mini" onClick={() => fileInput.current?.click()}><Upload size={15} /> Cambiar imagen</button>
-            <input ref={fileInput} hidden type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(e) => handleFile(e.target.files?.[0])} />
+            <input ref={fileInput} hidden type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(e) => { requestImport(e.target.files?.[0]); e.target.value='' }} />
           </div>
 
           <div className={`canvas-area ${handActive ? 'hand-active' : ''} ${panning ? 'is-panning' : ''}`} ref={viewportRef} onPointerDownCapture={startPan} onPointerMove={movePan} onPointerUp={stopPan} onPointerCancel={stopPan} onLostPointerCapture={stopPan}>
-            <div className="preview-background"><span>Vista sobre</span><select aria-label="Fondo de vista previa" value={previewBg} onChange={(e) => setPreviewBg(e.target.value)}><option value="checker">Transparencia</option><option value="black">Prenda negra</option><option value="white">Prenda blanca</option><option value="#596778">Prenda gris</option></select></div>
-            <div className="artboard" style={{ width: Math.max(1, (output?.width || dimensions.width) * previewScale), height: Math.max(1, (output?.height || dimensions.height) * previewScale), aspectRatio: `${dimensions.width} / ${dimensions.height}`, ...(previewBg !== 'checker' ? { backgroundImage: 'none', backgroundColor: previewBg } : {}) }}>
+            {!fileName && <div className="start-upload"><Upload size={36}/><h2>Arrastra tu imagen aquí</h2><p>PNG, JPG, WebP o SVG</p><button className="btn export" disabled={loading} onClick={()=>fileInput.current?.click()}>{loading?'Abriendo imagen…':'Abrir imagen'}</button>{error && <p className="error-text" role="alert">{error}</p>}</div>}
+            <div className="artboard" hidden={!fileName} style={{ width: Math.max(1, visibleSize.width * previewScale), height: Math.max(1, visibleSize.height * previewScale), aspectRatio: `${visibleSize.width} / ${visibleSize.height}`, ...(previewBg !== 'checker' ? { backgroundImage: 'none', backgroundColor: previewBg } : {}) }}>
               <canvas ref={sourceCanvas} className="art-canvas" style={{ clipPath: view === 'split' ? `inset(0 ${100 - split}% 0 0)` : 'none', visibility: view === 'result' ? 'hidden' : 'visible' }} />
               <div className="result-layer" style={{ clipPath: view === 'split' ? `inset(0 0 0 ${split}%)` : 'none', visibility: view === 'original' ? 'hidden' : 'visible' }}><canvas ref={resultCanvas} className="art-canvas" /></div>
               {view === 'split' && <><div className="split-line" style={{ left: `${split}%` }}><span><Minus /><Minus /></span></div><input className="split-input" aria-label="Divisor de comparación" type="range" min="0" max="100" value={split} onChange={(e) => setSplit(Number(e.target.value))} /></>}
@@ -418,15 +578,24 @@ function App() {
             {dragging && <div className="drop-overlay"><Upload size={32} /><b>Suelta tu imagen aquí</b><span>PNG, JPG, WebP o SVG</span></div>}
           </div>
 
-          <div className="statusbar">
+          <div className="statusbar" hidden={!fileName}>
             <div><span className="status-dot" /> Vista previa en tiempo real</div>
             <div className="zoom-control"><button className={`hand-button ${handActive ? 'active' : ''}`} aria-label="Mano para mover imagen" aria-pressed={handTool} title="Mano: arrastra para mover. También puedes mantener Espacio o usar el botón central del ratón." onClick={() => setHandTool(v => !v)}><Hand size={16} /></button><ZoomIn size={15} /><button aria-label="Reducir zoom" onClick={() => changeZoom(.8)}><Minus size={14} /></button><span>{shownZoom}%</span><button aria-label="Aumentar zoom" onClick={() => changeZoom(1.25)}><Plus size={14} /></button><button className="zoom-text" onClick={() => setFit(true)}>Ajustar</button><button className="zoom-text" onClick={() => {setFit(false);setZoom(100)}}>100%</button></div>
             <div>PNG · Fondo transparente</div>
           </div>
         </section>
       </main>
+      {showCrop && imageRef.current && <CropPanel image={imageRef.current} initial={crop ?? {x:0,y:0,width:dimensions.width,height:dimensions.height}} onCancel={()=>setShowCrop(false)} onApply={rect=>{setWidthCm((Number(widthCm)*rect.width/dimensions.width).toFixed(4));setDimensions({width:rect.width,height:rect.height});setCrop(rect);setShowCrop(false);setFit(true)}}/>}
     </div>
   )
 }
 
-export default App
+export default function ProjectSession() {
+  const [session,setSession]=useState(0)
+  function newProject() {
+    if(!window.confirm('¿Empezar de cero? Se vaciarán el editor, el Gang Sheet y su guardado en este navegador. Guarda un archivo de proyecto primero si quieres retomarlo. Tus presets y archivos descargados se conservarán. Esta acción no se puede deshacer.'))return
+    try {clearActiveProject(localStorage);setSession(s=>s+1)}
+    catch {window.alert('No se pudo limpiar el guardado del navegador. No se reinició la sesión. Revisa los permisos de almacenamiento.')}
+  }
+  return <App key={session} onNewProject={newProject}/>
+}

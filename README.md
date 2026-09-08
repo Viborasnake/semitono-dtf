@@ -2,6 +2,10 @@
 
 Aplicación web local para convertir diseños en semitonos listos para impresión DTF.
 
+Aplicación publicada: https://viborasnake.github.io/semitono-dtf/
+
+Cada push a `main` ejecuta pruebas, compila con la ruta base `/semitono-dtf/` y publica `dist` mediante GitHub Actions. Las imágenes y proyectos se procesan localmente en el navegador; no se suben al repositorio.
+
 ## Ejecutar
 
 Requiere Node.js 24 y npm. El procesamiento de imágenes ocurre en el navegador; no necesita claves API ni backend.
@@ -33,7 +37,9 @@ npm run build
 - Escala manual en porcentaje y botones 100%, 200%, 300% y 400%.
 - Ancho/alto en centímetros con proporciones bloqueadas; 150, 300 o 600 ppp.
 - Ampliación Lanczos-3 con colores ponderados por alfa y nitidez adicional de 0 a 100%.
-- Presets propios: Default, Nitidez, Full Gradients y Best Value. Conservan tamaño, eliminación de fondo y bordes.
+- Presets propios: Default, Nitidez, Full Gradients, Best Value, Monocolor, Prenda negra, Prenda blanca, Foto/degradados, Transparencia alta, Ahorro de tinta y Borde suave. Conservan tamaño, eliminación de fondo y bordes.
+- Correcciones automáticas: Tono automático, Contraste automático y Color automático. Son reversibles, combinables y se calculan a partir del original antes de la trama.
+- Flujo recomendado desde Gang Sheet: nombrar trabajo y escoger formato, importar para ajustar, enviar al Gang Sheet, repetir y exportar.
 - Guardar preset con nombre: almacena los ajustes de trama, color, fondo, nitidez y bordes en este navegador. Aparecen en “Mis presets” al recargar. No incluye imagen, tamaño ni zoom; los nombres repetidos reciben un sufijo para conservar los anteriores.
 - “Enviar a Gang Sheet” añade el resultado procesado a la plancha y la abre; el botón también está visible en pantallas pequeñas.
 - Desvanecido y eliminación de margen en milímetros, por lado. Se aplican antes de generar la trama y no recortan el tamaño del archivo.

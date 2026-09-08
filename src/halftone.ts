@@ -5,7 +5,7 @@ export type HalftoneSettings = {
   background: 'black' | 'white' | 'none'; tolerance: number
   dpi?: number; enabled?: boolean; featherMm?: number; trimMm?: number
   edgeSides?: boolean[]
-  sharpness?: number; gamma?: number
+  sharpness?: number; gamma?: number; solidAlpha?: boolean; cornerRadiusMm?: number
 }
 
 // Clustered ordered screening: retain the source detail inside each dot.
@@ -16,6 +16,7 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
   const pitch = dpi / s.lpi
   const feather = (s.featherMm ?? 0) / 25.4 * dpi
   const trim = (s.trimMm ?? 0) / 25.4 * dpi
+  const cornerRadius = Math.max(0, (s.cornerRadiusMm ?? 0) / 25.4 * dpi)
   const sides = s.edgeSides ?? [true, true, true, true]
   const circleRanks = Float64Array.from({length: 4097}, (_, i) => {
     const d = i / 2048
@@ -34,15 +35,15 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
     const edgeAlpha = t * t * (3 - 2 * t)
     if (!edgeAlpha) { transparent++; continue }
     let r = data[i] / 255, g = data[i + 1] / 255, b = data[i + 2] / 255
+    const left = (y * width + Math.max(0, x - 1)) * 4
+    const right = (y * width + Math.min(width - 1, x + 1)) * 4
+    const top = (Math.max(0, y - 1) * width + x) * 4
+    const bottom = (Math.min(height - 1, y + 1) * width + x) * 4
     if (s.sharpness) {
-      const left = (y * width + Math.max(0, x - 1)) * 4
-      const right = (y * width + Math.min(width - 1, x + 1)) * 4
-      const top = (Math.max(0, y - 1) * width + x) * 4
-      const bottom = (Math.min(height - 1, y + 1) * width + x) * 4
       const sharpen = (value: number, channel: number) => {
         let sum = 0, weights = 0
         for (const j of [left, right, top, bottom]) { const alpha = data[j + 3] / 255; sum += data[j + channel] / 255 * alpha; weights += alpha }
-        return clamp(value + (value - (weights ? sum / weights : value)) * s.sharpness! / 100 * 2)
+        return clamp(value + (value - (weights ? sum / weights : value)) * s.sharpness! / 100 * 6)
       }
       r = sharpen(r, 0); g = sharpen(g, 1); b = sharpen(b, 2)
     }
@@ -77,7 +78,25 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
     output[i] = s.preserveColor ? r * 255 : mono
     output[i + 1] = s.preserveColor ? g * 255 : mono
     output[i + 2] = s.preserveColor ? b * 255 : mono
-    output[i + 3] = hits * 255 / 4
+    output[i + 3] = (s.solidAlpha === true || (s.enabled !== false && s.solidAlpha !== false)) ? 255 : hits * 255 / 4
+  }
+  // Apply the corner radius to the final alpha mask as a second pass. Doing
+  // this after screening/background removal guarantees that the visible design
+  // (rather than the source canvas or matte) gets rounded corners.
+  if (cornerRadius > 0) {
+    let ox=width, oy=height, ex=-1, ey=-1
+    for (let y=0;y<height;y++) for (let x=0;x<width;x++) {
+      if (output[(y*width+x)*4+3] > 0) { ox=Math.min(ox,x); oy=Math.min(oy,y); ex=Math.max(ex,x); ey=Math.max(ey,y) }
+    }
+    if (ex >= ox && ey >= oy) {
+      const rx=Math.min(cornerRadius,(ex-ox+1)/2), ry=Math.min(cornerRadius,(ey-oy+1)/2)
+      for (let y=oy;y<=ey;y++) for (let x=ox;x<=ex;x++) {
+        const cx=Math.max(ox+rx,Math.min(ex+1-rx,x+.5))
+        const cy=Math.max(oy+ry,Math.min(ey+1-ry,y+.5))
+        const i=(y*width+x)*4
+        if (output[i+3] && ((x+.5-cx)/rx)**2+((y+.5-cy)/ry)**2>1) { output[i]=output[i+1]=output[i+2]=output[i+3]=0; transparent++ }
+      }
+    }
   }
   return { data: output, transparent: Math.round(transparent / (width * height) * 100) }
 }
