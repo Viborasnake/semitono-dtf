@@ -160,6 +160,7 @@ input[type=checkbox] { accent-color:var(--aqua); }
 .scale-presets button { flex:1; border:1px solid #355b4b; background:#162a21; color:#bcf5dc; padding:7px 0; border-radius:5px; font-size:11px; cursor:pointer; }
 .gang-stage { min-height:0; min-width:0; display:grid; grid-template-rows:auto minmax(0,1fr) auto; background:#0d1013; }
 .gang-workspace .asset-selected { border-color:var(--aqua); }
+.warning-inline { color:#f0c989; }
 .asset-title .asset-select { background:transparent; color:inherit; text-align:left; min-width:0; overflow-wrap:anywhere; flex:1; }
 .gang-preview-panel { position:relative; min-height:0; min-width:0; display:grid; grid-template-rows:auto minmax(0,1fr); }
 .gang-zoom { display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:8px 12px; border-bottom:1px solid var(--line); }
