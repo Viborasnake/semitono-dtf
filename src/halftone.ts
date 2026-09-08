@@ -1,3 +1,4 @@
+import {connectedWhiteBackground} from './white-background.ts'
 export type HalftoneSettings = {
   lpi: number; angle: number; shape: 'circle' | 'square' | 'line'; size: number
   contrast: number; brightness: number; whiteCutoff: number
@@ -6,6 +7,7 @@ export type HalftoneSettings = {
   dpi?: number; enabled?: boolean; featherMm?: number; trimMm?: number
   edgeSides?: boolean[]
   sharpness?: number; gamma?: number; solidAlpha?: boolean; cornerRadiusMm?: number
+  whiteRemoval?: 'all' | 'connected'
 }
 
 // Clustered ordered screening: retain the source detail inside each dot.
@@ -18,6 +20,7 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
   const trim = (s.trimMm ?? 0) / 25.4 * dpi
   const cornerRadius = Math.max(0, (s.cornerRadiusMm ?? 0) / 25.4 * dpi)
   const sides = s.edgeSides ?? [true, true, true, true]
+  const whiteMask=s.background==='white'&&s.whiteRemoval==='connected'?connectedWhiteBackground(data,width,height,s.whiteCutoff):null
   const circleRanks = Float64Array.from({length: 4097}, (_, i) => {
     const d = i / 2048
     return d <= 1 ? Math.PI * d / 4 : Math.PI * d / 4 - d * Math.acos(1 / Math.sqrt(d)) + Math.sqrt(d - 1)
@@ -30,6 +33,7 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
     const i = (y * width + x) * 4
     if (!data[i + 3]) { transparent++; continue }
+    if(whiteMask?.[y*width+x]){transparent++;continue}
     const distance = Math.min(sides[0] ? y : Infinity, sides[1] ? width - 1 - x : Infinity, sides[2] ? height - 1 - y : Infinity, sides[3] ? x : Infinity) - trim
     const t = feather > 0 ? clamp(distance / feather) : distance < 0 ? 0 : 1
     const edgeAlpha = t * t * (3 - 2 * t)
@@ -53,6 +57,9 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
       coverage = max <= s.tolerance / 255 ? 0 : clamp((max - s.tolerance / 255) / (1 - s.tolerance / 255))
       // Remove the black matte so sparse dots do not become dark halos.
       if (max > 0) { r /= max; g /= max; b /= max }
+    } else if (s.background === 'white' && whiteMask) {
+      // Interior colors (including white fur and pale details) stay intact.
+      coverage=1
     } else if (s.background === 'white') {
       coverage = min >= s.whiteCutoff / 255 ? 0 : clamp(1 - min / (s.whiteCutoff / 255))
       if (min < 1) { r = (r - min) / (1 - min); g = (g - min) / (1 - min); b = (b - min) / (1 - min) }

@@ -49,6 +49,8 @@ npm run build
 
 Para un diseño con fondo negro, selecciona **Eliminar fondo → Negro**. Ajusta **Eliminar sombras** hasta quitar el fondo conservando los detalles. Esta operación afecta a los negros de toda la imagen, incluidos los del interior del dibujo. Revisa el resultado sobre una prenda negra y usa el damero para comprobar los huecos transparentes.
 
+Para fondos blancos con detalles claros que quieras conservar, selecciona **Prenda blanca · conservar detalle**. El preset quita los tonos claros conectados al borde, conserva las zonas interiores y muestra el diseño sobre blanco. En **Dónde quitar blanco** puedes elegir eliminar todos los blancos para generar una trama que aproveche el blanco de la prenda. El umbral controla qué tonos se consideran fondo; si el pelaje claro conecta con el exterior, también puede eliminarse. La vista de prenda por sí sola no cambia el procesamiento.
+
 Pruebas del motor:
 
 ```bash

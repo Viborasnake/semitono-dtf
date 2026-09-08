@@ -32,6 +32,35 @@ test('white mode removes white and keeps black', () => {
   assert.equal(halftone(image(255,255,255),64,64,s).transparent,100)
   assert.equal(halftone(image(0,0,0),64,64,s).transparent,0)
 })
+test('connected white removal preserves enclosed fur, cream details and saturated ink',()=>{
+  const data=image(250,248,245)
+  // Closed dark border enclosing white fur and a cream highlight.
+  for(let y=16;y<48;y++)for(let x=16;x<48;x++)data.set([20,15,10,255],(y*64+x)*4)
+  for(let y=20;y<44;y++)for(let x=20;x<44;x++)data.set([255,255,255,255],(y*64+x)*4)
+  data.set([245,236,210,255],(32*64+32)*4)
+  data.set([235,25,15,255],(20*64+16)*4)
+  for(const enabled of [true,false]){
+    const out=halftone(data,64,64,{...settings,background:'white',whiteRemoval:'connected',whiteCutoff:242,solidAlpha:false,enabled}).data
+    assert.equal(out[3],0)
+    for(let y=16;y<48;y++)for(let x=16;x<48;x++)assert.deepEqual(out.slice((y*64+x)*4,(y*64+x)*4+4),data.slice((y*64+x)*4,(y*64+x)*4+4))
+  }
+  const all=halftone(data,64,64,{...settings,background:'white',whiteRemoval:'all',whiteCutoff:242}).data
+  assert.equal(all[(30*64+30)*4+3],0)
+})
+test('white threshold affects only near-white regions reachable from an edge',()=>{
+  const data=image(240,240,240)
+  assert.equal(halftone(data,64,64,{...settings,background:'white',whiteRemoval:'connected',whiteCutoff:242}).transparent,0)
+  assert.equal(halftone(data,64,64,{...settings,background:'white',whiteRemoval:'connected',whiteCutoff:235}).transparent,100)
+  assert.equal(halftone(image(0,0,0,0),64,64,{...settings,background:'white',whiteRemoval:'connected'}).transparent,100)
+})
+test('connected white removal traverses transparent margins without removing colored interior',()=>{
+  const data=image(0,0,0,0)
+  for(let y=8;y<56;y++)for(let x=8;x<56;x++)data.set([255,255,255,255],(y*64+x)*4)
+  data.set([230,20,15,255],(32*64+32)*4)
+  const out=halftone(data,64,64,{...settings,background:'white',whiteRemoval:'connected'}).data
+  assert.equal(out[(8*64+8)*4+3],0)
+  assert.deepEqual(Array.from(out.slice((32*64+32)*4,(32*64+32)*4+4)),[230,20,15,255])
+})
 test('original transparent pixels never acquire ink', () => {
   assert.equal(halftone(image(255,255,255,0),64,64,settings).transparent,100)
 })

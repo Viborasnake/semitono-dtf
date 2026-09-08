@@ -23,6 +23,7 @@ export type Settings = {
   preserveColor: boolean
   invert: boolean
   background: 'black' | 'white' | 'none'
+  whiteRemoval?: 'all' | 'connected'
   tolerance: number
   enabled: boolean
   featherMm: number
@@ -53,6 +54,7 @@ const defaults: Settings = {
   preserveColor: true,
   invert: false,
   background: 'black',
+  whiteRemoval: 'all',
   tolerance: 25,
   enabled: true,
   featherMm: 0,
@@ -79,7 +81,7 @@ const presets = {
   value: { label: 'Best Value', description: 'Menor cobertura de tinta con una trama abierta.', values: { lpi: 30, size: 82, contrast: 100, brightness: 100, sharpness: 15, gamma: 1 } },
   monochrome: { label: 'Monocolor', description: 'Salida limpia en un solo color para logos y textos.', values: { lpi: 35, angle: 22.5, shape: 'circle' as Shape, size: 98, contrast: 112, brightness: 100, sharpness: 25, gamma: .92, preserveColor: false, background: 'black' as const, tolerance: 22 } },
   darkGarment: { label: 'Prenda negra', description: 'Color completo y eliminación de negros de fondo.', values: { lpi: 32, size: 94, contrast: 104, brightness: 102, sharpness: 18, gamma: 1, preserveColor: true, background: 'black' as const, tolerance: 28 } },
-  lightGarment: { label: 'Prenda blanca', description: 'Elimina blancos y conserva transparencias limpias.', values: { lpi: 32, size: 94, contrast: 104, brightness: 100, sharpness: 18, gamma: 1, preserveColor: true, background: 'white' as const, whiteCutoff: 242 } },
+  lightGarment: { label: 'Prenda blanca · conservar detalle', description: 'Quita el fondo claro conectado al borde y conserva colores y blancos interiores. Si el fondo entra en el dibujo, sube el umbral.', values: { lpi: 32, angle:22.5, shape:'circle' as Shape, size: 100, contrast: 100, brightness: 100, sharpness: 0, gamma: 1, preserveColor: true, invert:false, enabled:true, background: 'white' as const, whiteRemoval:'connected' as const, whiteCutoff: 242,solidAlpha:false,autoTone:false,autoContrast:false,autoColor:false,temperature:0,tint:0 } },
   photo: { label: 'Foto / degradados', description: 'Trama suave para pieles, sombras y degradados fotográficos.', values: { lpi: 42, size: 100, contrast: 96, brightness: 102, sharpness: 12, gamma: 1.3, preserveColor: true, background: 'none' as const } },
   transparent: { label: 'Transparencia alta', description: 'Puntos abiertos para que respire más la prenda.', values: { lpi: 28, size: 72, contrast: 98, brightness: 100, sharpness: 8, gamma: 1.18 } },
   lowInk: { label: 'Ahorro de tinta', description: 'Cobertura reducida para bajar consumo y mantener lectura.', values: { lpi: 38, size: 68, contrast: 108, brightness: 100, sharpness: 20, gamma: 1.08 } },
@@ -100,6 +102,7 @@ function readSavedPresets(): SavedPreset[] {
       const ranges = {lpi:[12,65],angle:[0,90],size:[45,125],contrast:[50,180],brightness:[60,140],whiteCutoff:[170,255],tolerance:[0,100],featherMm:[0,30],trimMm:[0,15],cornerRadiusMm:[0,50],sharpness:[0,100],gamma:[.5,2],temperature:[-100,100],tint:[-100,100],autoColorStrength:[0,100],autoToneStrength:[0,100],autoContrastStrength:[0,100]}
       return Object.entries(ranges).every(([key,[min,max]]) => Number.isFinite(s[key]) && s[key] >= min && s[key] <= max)
         && ['circle','square','line'].includes(s.shape) && ['black','white','none'].includes(s.background)
+        && (s.whiteRemoval===undefined||['all','connected'].includes(s.whiteRemoval))
         && ['enabled','preserveColor','invert'].every(key => typeof s[key] === 'boolean')
         && ['autoTone','autoContrast','autoColor','solidAlpha'].every(key => s[key] === undefined || typeof s[key] === 'boolean')
         && Array.isArray(s.edgeSides) && s.edgeSides.length === 4 && s.edgeSides.every((v:unknown) => typeof v === 'boolean')
@@ -468,9 +471,9 @@ function App({onNewProject}:{onNewProject:()=>void}) {
               const saved = savedPresets.find(p => p.id === key)
               setPresetMessage('')
               if(saved){setSettings({...saved.settings,edgeSides:[...saved.settings.edgeSides]});setPreset(key)}
-              else if(key in presets){setSettings(s => ({...s,...presets[key as keyof typeof presets].values}));setPreset(key)}
+              else if(key in presets){setSettings(s => ({...s,...presets[key as keyof typeof presets].values}));setPreset(key);if(key==='lightGarment')setPreviewBg('white')}
             }}><option value="custom" disabled>Personalizado</option><optgroup label="Incluidos">{Object.entries(presets).map(([key,p]) => <option key={key} value={key}>{p.label}</option>)}</optgroup>{savedPresets.length>0 && <optgroup label="Mis presets">{savedPresets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>}</select>
-            <p className="help-text">{preset in presets ? `${presets[preset as keyof typeof presets].description} Conserva el tamaño, fondo y bordes elegidos.` : preset.startsWith('saved:') ? 'Preset guardado: trama, nitidez, fondo y bordes. El tamaño de impresión se mantiene.' : 'Ajustes personalizados.'}</p>
+            <p className="help-text">{preset in presets ? `${presets[preset as keyof typeof presets].description} Conserva el tamaño y los bordes elegidos.` : preset.startsWith('saved:') ? 'Preset guardado: trama, nitidez, fondo y bordes. El tamaño de impresión se mantiene.' : 'Ajustes personalizados.'}</p>
             <button className="btn save-preset" aria-expanded={savingPreset} onClick={() => {setSavingPreset(v=>!v);setPresetMessage('')}}>Guardar preset</button>
             {savingPreset && <form className="save-preset-form" onSubmit={e=>{e.preventDefault();savePreset()}}><label className="field">Nombre del preset<input autoFocus aria-label="Nombre del preset" type="text" maxLength={60} placeholder="Ej. DTF negro fino" value={presetName} onChange={e=>setPresetName(e.target.value)} /></label><button className="btn export" type="submit" disabled={!presetName.trim()}>Guardar mis ajustes</button><p className="help-text">Se guarda en este navegador. Incluye trama, color, fondo, nitidez y bordes; excluye tamaño y zoom.</p></form>}
             {presetMessage && <p className="help-text" role="status">{presetMessage}</p>}
@@ -496,6 +499,8 @@ function App({onNewProject}:{onNewProject:()=>void}) {
             <div className="segmented"><button className={settings.background === 'black' ? 'active' : ''} onClick={() => update('background', 'black')}>Negro</button><button className={settings.background === 'white' ? 'active' : ''} onClick={() => update('background', 'white')}>Blanco</button><button className={settings.background === 'none' ? 'active' : ''} onClick={() => update('background', 'none')}>Ninguno</button></div>
             {settings.background === 'black' && <RangeControl label="Eliminar sombras" value={settings.tolerance} min={0} max={100} onChange={(v) => update('tolerance', v)} />}
             {settings.background === 'white' && <RangeControl label="Umbral de blancos" value={settings.whiteCutoff} min={170} max={255} onChange={(v) => update('whiteCutoff', v)} />}
+            {settings.background==='white' && <><label className="field">Dónde quitar blanco<select aria-label="Dónde quitar blanco" value={settings.whiteRemoval??'all'} onChange={e=>update('whiteRemoval',e.target.value as 'all'|'connected')}><option value="connected">Solo fondo conectado al borde</option><option value="all">Todos los blancos · trama sobre blanco</option></select></label><p className="help-text">{settings.whiteRemoval==='connected'?'Conserva detalles claros encerrados en el dibujo. Un umbral más bajo elimina más tonos crema del fondo; si se conectan con el pelaje, también pueden quitarse. Al 100% de tamaño de punto, el interior conserva su cobertura original.':'La prenda aporta el blanco de toda la imagen. Los tonos claros se convierten en puntos; también afecta al pelaje y detalles interiores.'}</p></>}
+            <p className="help-text">«Vista sobre» cambia solo la previsualización. La eliminación de fondo se elige aquí.</p>
           </div></section>
 
           <section className={`control-card ${collapsedPanels.trama ? '' : 'open'}`}>
@@ -545,7 +550,7 @@ function App({onNewProject}:{onNewProject:()=>void}) {
             <div className="edge-sides">{['Arriba', 'Derecha', 'Abajo', 'Izquierda'].map((label, index) => <label key={label}><input type="checkbox" checked={settings.edgeSides[index]} onChange={e => update('edgeSides', settings.edgeSides.map((v, i) => i === index ? e.target.checked : v))} />{label}</label>)}</div>
             <p className="help-text">Borra el contorno rectangular, suaviza los lados y permite redondear las cuatro esquinas. El tamaño del lienzo se conserva.</p>
           </div></section>
-          <div className="tip-card"><div><Check size={14} /> {processing ? 'ACTUALIZANDO…' : `${transparent}% TRANSPARENTE`}</div><p>{settings.background === 'black' ? 'El negro lo aporta la prenda. Se eliminan los tonos oscuros del diseño completo.' : settings.background === 'white' ? 'Se eliminan los blancos del diseño completo.' : 'Se conserva el color y se perfora con la trama.'} El fondo de vista previa no se exporta.</p></div>
+          <div className="tip-card"><div><Check size={14} /> {processing ? 'ACTUALIZANDO…' : `${transparent}% TRANSPARENTE`}</div><p>{settings.background === 'black' ? 'El negro lo aporta la prenda. Se eliminan los tonos oscuros del diseño completo.' : settings.background === 'white' ? settings.whiteRemoval==='connected'?'Se quita el fondo claro conectado al borde; se conservan los detalles interiores.':'Se eliminan los blancos del diseño completo.' : 'Se conserva el color y se perfora con la trama.'} El fondo de vista previa no se exporta.</p></div>
           {error && <p className="error-text" role="alert">{error}</p>}
           {exportMessage && <p className="export-message" role="status">{exportMessage}</p>}
         </aside>

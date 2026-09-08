@@ -7,6 +7,7 @@ const png=(s:unknown)=>typeof s==='string'&&/^data:image\/png;base64,[A-Za-z0-9+
 function checkDocument(d:EditorDocument) {
   if(!d||d.version!==1||!png(d.original)||!positive(d.widthCm)||![150,300,600].includes(d.dpi)||!d.settings)fail()
   const s=d.settings
+  if(s.whiteRemoval!==undefined&&!['all','connected'].includes(s.whiteRemoval))fail()
   const numeric=['lpi','angle','size','contrast','brightness','whiteCutoff','tolerance','featherMm','cornerRadiusMm','trimMm','sharpness','gamma','autoToneStrength','autoContrastStrength','temperature','tint','autoColorStrength'] as const
   const boolean=['preserveColor','invert','enabled','autoTone','autoContrast','autoColor','solidAlpha'] as const
   if(numeric.some(k=>typeof s[k]!=='number'||!Number.isFinite(s[k]))||boolean.some(k=>typeof s[k]!=='boolean')||!['circle','square','line'].includes(s.shape)||!['black','white','none'].includes(s.background)||!Array.isArray(s.edgeSides)||s.edgeSides.length!==4||s.edgeSides.some(v=>typeof v!=='boolean'))fail()
