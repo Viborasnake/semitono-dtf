@@ -11,6 +11,13 @@
 
 ## Cambios funcionales
 
+### SEO y vista previa al compartir — 2026-09-09, local
+
+- `index.html` incorpora descripción, robots, URL canónica, Open Graph y Twitter/X Card con título, descripción, URL e icono de Trama DTF.
+- Se añadió JSON-LD `WebApplication` para describir el editor a buscadores, conservando idioma español y la URL de GitHub Pages.
+- Se añadieron `public/robots.txt` y `public/sitemap.xml` apuntando a la URL pública del sitio.
+- La miniatura usa `icon-512.png` (512×512); las plataformas pueden recortarla según el formato de tarjeta. Las etiquetas se probaron en el build local; la vista final depende de la caché de cada plataforma social.
+
 ### Icono de app y Safari iOS — 2026-09-09, local
 
 - Se incorporó la imagen proporcionada como icono de navegador (16/32 px), icono de pantalla de inicio de iOS (180 px) y variantes de manifest (192/512 px).
@@ -160,6 +167,12 @@
 - Última revisión: siete pruebas adicionales sobre esquinas, alfa parcial, migración de presets y serialización/actualización de documentos sin duplicar diseños ni perder copias. Nuevos módulos: `src/preset-migration.ts`, `src/editor-document.ts` y sus pruebas. La recuperación tras recargar y el flujo completo de reedición aún requieren prueba manual en navegador; la serialización está cubierta por pruebas unitarias.
 
 ## Puntos para auditoría posterior
+
+## Icono de la app: corrección de borde — 2026-09-09, local
+
+- Se regeneraron `icon-512.png`, `icon-192.png`, `apple-touch-icon.png`, `favicon-32.png` y `favicon-16.png` sin el marco blanco exterior que aparecía al instalar/añadir la app desde Safari.
+- Se mantuvieron el perro pixel-art, la plancha, el texto DTF y la barra de color; los cinco tamaños se derivan de la misma imagen cuadrada para evitar variantes desalineadas.
+- El cambio está preparado localmente y no se ha desplegado a GitHub.
 
 - Para auditar, comparar el código publicado con `7bc0b7f` y revisar también cualquier cambio posterior del árbol de trabajo.
 - La distribución es heurística determinista (24 candidatos), no un solucionador matemático óptimo para todos los casos.
