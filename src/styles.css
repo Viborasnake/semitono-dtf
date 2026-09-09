@@ -154,6 +154,11 @@ input[type=checkbox] { accent-color:var(--aqua); }
 .project-start-card form { display:grid; gap:12px; margin:24px 0 16px; }
 .project-start-card input,.save-preset-form input { min-width:0; width:100%; padding:12px; color:#e4ece8; background:#0b0e11; border:1px solid #35413b; border-radius:8px; }
 .project-start-card .eyebrow { color:var(--aqua); font-size:12px; letter-spacing:.12em; font-weight:700; }
+.auth-page { min-height:100dvh; display:grid; place-items:center; padding:24px; background:#0c1011; color:#e4ece8; }
+.auth-card { width:min(100%,420px); padding:30px; border:1px solid #35483f; border-radius:20px; background:#12191a; box-shadow:0 24px 80px #0005; }
+.auth-card h1 { font-size:28px; margin:14px 0 8px; }
+.auth-card > p { color:#aab4af; margin:0; }
+.auth-card form { display:grid; gap:16px; margin-top:26px; }
 .project-status { min-width:0; display:grid; gap:3px; margin-right:auto; font-size:11px; }
 .project-status strong { max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .project-status span { color:#99b6aa; }

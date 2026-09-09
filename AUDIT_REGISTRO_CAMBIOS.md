@@ -11,6 +11,12 @@
 
 ## Cambios funcionales
 
+### Puerta de acceso para GitHub Pages — 2026-09-09, local y publicada
+
+- Se añadió una pantalla de acceso antes de montar el editor: usuario `viborasnake@gmail.com` y contraseña verificada con SHA-256. La sesión se conserva solo en `sessionStorage` de la pestaña.
+- La contraseña en texto plano no se guarda en el repositorio ni en el navegador. El hash dentro de un frontend estático solo disuade el acceso casual; no constituye control de acceso de servidor porque el código publicado puede inspeccionarse y modificarse.
+- Se incorporó al build de GitHub Pages y se verificó con pruebas y compilación. Para privacidad real del sitio se requiere autenticación en servidor o una capa como Cloudflare Access/GitHub Enterprise.
+
 ### Cinco presets de semitono por tono de prenda — 2026-09-08, local
 
 - Se mantienen los tres presets de semitono existentes de cada tono, con sus identificadores y valores. Se añaden «Trama marcada» (24 LPI, cobertura neutra) y «Reducir ruido» (45 LPI, limpieza de fondo al 35%) tanto para prenda oscura como clara. Los nuevos presets claros usan detalle 0%.
