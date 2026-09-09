@@ -11,6 +11,12 @@
 
 ## Cambios funcionales
 
+### Icono de app y Safari iOS — 2026-09-09, local
+
+- Se incorporó la imagen proporcionada como icono de navegador (16/32 px), icono de pantalla de inicio de iOS (180 px) y variantes de manifest (192/512 px).
+- `index.html` incluye metadatos de aplicación iOS, título «Trama DTF», color de barra y enlaces relativos compatibles con GitHub Pages bajo `/semitono-dtf/`.
+- Se añadió `public/manifest.webmanifest` con modo independiente, nombre corto y colores de la aplicación.
+
 ### Puerta de acceso para GitHub Pages — 2026-09-09, local y publicada
 
 - Se añadió una pantalla de acceso antes de montar el editor: usuario `viborasnake@gmail.com` y contraseña verificada con SHA-256. La sesión se conserva solo en `sessionStorage` de la pestaña.
