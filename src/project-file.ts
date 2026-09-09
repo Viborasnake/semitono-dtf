@@ -1,16 +1,25 @@
 import type {EditorDocument} from './editor-document'
+import {validColorRange} from './color-range.ts'
 export type ProjectAsset={id:string;name:string;dataUrl:string;naturalWidth:number;naturalHeight:number;widthCm:number;heightCm:number;quantity:number;document?:EditorDocument}
 export type ProjectFile={format:'trama-dtf';version:1;name:string;sheet:{width:number;height:number;dpi:number;gap:number;rotate:boolean};background:string;items:ProjectAsset[];editor?:{name:string;document:EditorDocument;assetId?:string}}
+// A project embeds raster assets as PNG data URLs. Keep a generous guard against
+// accidental browser freezes while allowing realistic multi-design gang sheets.
+export const MAX_PROJECT_FILE_BYTES = 1_000_000_000
 const fail=()=>{throw new Error('Proyecto inválido o incompatible. No se cambió el trabajo actual.')}
 const positive=(n:unknown)=>typeof n==='number'&&Number.isFinite(n)&&n>0
 const png=(s:unknown)=>typeof s==='string'&&/^data:image\/png;base64,[A-Za-z0-9+/=]+$/.test(s)
 function checkDocument(d:EditorDocument) {
   if(!d||d.version!==1||!png(d.original)||!positive(d.widthCm)||![150,300,600].includes(d.dpi)||!d.settings)fail()
   const s=d.settings
+  if((s.colorRange!==undefined&&!validColorRange(s.colorRange))||(s.background==='custom'&&!validColorRange(s.colorRange)))fail()
+  if(s.customBase!==undefined&&!['black','white'].includes(s.customBase))fail()
+  if(d.garment!==undefined&&!['dark','light'].includes(d.garment))fail()
   if(s.whiteRemoval!==undefined&&!['all','connected'].includes(s.whiteRemoval))fail()
+  if(s.whiteDetail!==undefined&&(!Number.isFinite(s.whiteDetail)||s.whiteDetail<0||s.whiteDetail>100))fail()
+  if(s.backgroundCleanup!==undefined&&(!Number.isFinite(s.backgroundCleanup)||s.backgroundCleanup<0||s.backgroundCleanup>100))fail()
   const numeric=['lpi','angle','size','contrast','brightness','whiteCutoff','tolerance','featherMm','cornerRadiusMm','trimMm','sharpness','gamma','autoToneStrength','autoContrastStrength','temperature','tint','autoColorStrength'] as const
   const boolean=['preserveColor','invert','enabled','autoTone','autoContrast','autoColor','solidAlpha'] as const
-  if(numeric.some(k=>typeof s[k]!=='number'||!Number.isFinite(s[k]))||boolean.some(k=>typeof s[k]!=='boolean')||!['circle','square','line'].includes(s.shape)||!['black','white','none'].includes(s.background)||!Array.isArray(s.edgeSides)||s.edgeSides.length!==4||s.edgeSides.some(v=>typeof v!=='boolean'))fail()
+  if(numeric.some(k=>typeof s[k]!=='number'||!Number.isFinite(s[k]))||boolean.some(k=>typeof s[k]!=='boolean')||!['circle','square','line'].includes(s.shape)||!['black','white','none','custom'].includes(s.background)||!Array.isArray(s.edgeSides)||s.edgeSides.length!==4||s.edgeSides.some(v=>typeof v!=='boolean'))fail()
   if(s.lpi<=0||s.gamma<=0||s.featherMm<0||s.trimMm<0||s.cornerRadiusMm<0)fail()
   if(d.crop&&(![d.crop.x,d.crop.y,d.crop.width,d.crop.height].every(Number.isInteger)||d.crop.x<0||d.crop.y<0||d.crop.width<1||d.crop.height<1))fail()
 }

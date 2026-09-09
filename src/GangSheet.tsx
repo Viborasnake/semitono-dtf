@@ -1,13 +1,15 @@
 import GangPreview from './GangPreview'
-import {parseProject,type ProjectFile} from './project-file'
-import { useEffect, useRef, useState } from 'react'
+import {parseProject,type ProjectFile,MAX_PROJECT_FILE_BYTES} from './project-file'
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from 'react'
+import {useProjectAutosave,type ProjectSaveStatus} from './use-project-autosave'
 import { pack } from './packing'
 import { inspectPng, withCanvasPrintProfile, resolutionCheck } from './print'
 import type {EditorDocument,GangSource} from './editor-document'
 import {updateGangAsset} from './editor-document'
 
 type Asset = {id:string;name:string;img:CanvasImageSource;naturalWidth:number;naturalHeight:number;widthCm:number;heightCm:number;quantity:number;document?:EditorDocument}
-type Props = {source?:GangSource; onImportFile?:(file:File)=>void; onEditDocument?:(document:EditorDocument,name:string,id:string)=>void; previewColor?:string; onPreviewColorChange?:(value:string)=>void; getEditor?:()=>ProjectFile['editor']; restoreEditor?:(editor:ProjectFile['editor'])=>void}
+export type ProjectActions={save:()=>void;open:()=>void}
+type Props = {source?:GangSource; onImportFile?:(file:File)=>void; onEditDocument?:(document:EditorDocument,name:string,id:string)=>void; previewColor?:string; onPreviewColorChange?:(value:string)=>void; getEditor?:()=>ProjectFile['editor']; restoreEditor?:(editor:ProjectFile['editor'])=>void; initialProject:ProjectFile;editorRevision:string;editorLoading:boolean;onSaveStatus:(s:ProjectSaveStatus)=>void;actionsRef?:Ref<ProjectActions>}
 type SavedAsset = {id:string;name:string;dataUrl:string;naturalWidth:number;naturalHeight:number;widthCm:number;heightCm:number;quantity:number;document?:EditorDocument}
 const sheetStorageKey = 'trama-dtf-gang-sheet-v1'
 function savedSheetSettings() {
@@ -17,7 +19,7 @@ function savedSheetSettings() {
   } catch { return {width:58,height:100,dpi:300,gap:5,rotate:true} }
 }
 
-export default function GangSheet({source,onImportFile,onEditDocument,previewColor,onPreviewColorChange,getEditor,restoreEditor}: Props) {
+export default function GangSheet({source,onImportFile,onEditDocument,previewColor,onPreviewColorChange,getEditor,restoreEditor,initialProject,editorRevision,editorLoading,onSaveStatus,actionsRef}: Props) {
   const [items,setItems] = useState<Asset[]>([])
   const [selectedId,setSelectedId]=useState<string|null>(null)
   const selectedAsset=items.find(a=>a.id===selectedId)
@@ -27,8 +29,8 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
     if(item?.document&&onEditDocument)onEditDocument({...item.document,widthCm:item.widthCm},item.name,item.id)
     else setError('Este diseño no tiene el original editable guardado. Importa el original al editor para evitar volver a tramar un PNG procesado.')
   }
-  const restored = useRef(false)
-  const initial=useRef(savedSheetSettings())
+  const [hydrated,setHydrated]=useState(false)
+  const initial=useRef(initialProject.sheet)
   const [width,setWidth] = useState(initial.current.width)
   const [height,setHeight] = useState(initial.current.height)
   const [dpi,setDpi] = useState(initial.current.dpi)
@@ -40,16 +42,29 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
   const [busy,setBusy] = useState(false)
   const [saveState,setSaveState]=useState('Cargando guardado…')
   const [acceptedResolution,setAcceptedResolution]=useState('')
-  const [projectName,setProjectName] = useState(()=>localStorage.getItem('trama-dtf-project-name') || 'Mi Gang Sheet')
+  const [projectName,setProjectName] = useState(initialProject.name)
   const input = useRef<HTMLInputElement>(null)
   const projectInput=useRef<HTMLInputElement>(null)
   const [projectBusy,setProjectBusy]=useState(false)
+  const [assetLoading,setAssetLoading]=useState(0)
+  const serializedImages=useRef(new WeakMap<object,string>())
+  function projectSnapshot():ProjectFile {
+    const editor=getEditor?.()
+    if(editor?.assetId&&!items.some(a=>a.id===editor.assetId))delete editor.assetId
+    const project:ProjectFile={format:'trama-dtf',version:1,name:projectName.trim(),sheet:{width,height,dpi,gap,rotate},background:previewBg,editor,items:items.map(({img,...a})=>{
+      let dataUrl=serializedImages.current.get(img as object)
+      if(!dataUrl){dataUrl=(img as HTMLCanvasElement).toDataURL('image/png');serializedImages.current.set(img as object,dataUrl)}
+      return {...a,dataUrl}
+    })}
+    if(!project.name)throw new Error('El proyecto necesita un nombre.')
+    return project
+  }
+  useProjectAutosave(projectSnapshot,[items,projectName,width,height,dpi,gap,rotate,previewBg,editorRevision],hydrated&&!projectBusy&&!editorLoading&&assetLoading===0,status=>{setSaveState(status.message);onSaveStatus({...status,name:status.name||projectName})})
+  useImperativeHandle(actionsRef,()=>({save:()=>{void saveProject()},open:()=>projectInput.current?.click()}))
   async function saveProject() {
     setProjectBusy(true);setError('')
     try {
-      const editor=getEditor?.()
-      if(editor?.assetId&&!items.some(a=>a.id===editor.assetId))delete editor.assetId
-      const project:ProjectFile={format:'trama-dtf',version:1,name:projectName,sheet:{width,height,dpi,gap,rotate},background:previewBg,editor,items:items.map(a=>({...a,img:undefined,dataUrl:(a.img as HTMLCanvasElement).toDataURL('image/png')}))}
+      const project=projectSnapshot()
       const text=JSON.stringify(project);parseProject(text)
       const url=URL.createObjectURL(new Blob([text],{type:'application/json'}))
       const link=document.createElement('a');link.href=url;link.download=`${projectName.replace(/[^\p{L}\p{N}_-]+/gu,'-')||'proyecto'}.trama.json`;link.click()
@@ -61,14 +76,10 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
     if(!window.confirm('Abrir reemplazará el Gang Sheet y el editor actuales. Guarda primero el proyecto si quieres conservarlos. ¿Continuar?'))return
     setProjectBusy(true);setError('')
     try {
-      if(file.size>350_000_000)throw new Error('El proyecto supera el límite de 350 MB.')
+      if(file.size>MAX_PROJECT_FILE_BYTES)throw new Error('El proyecto supera el límite de 1 GB.')
       const p=parseProject(await file.text())
-      async function decode(src:string){const img=new Image();await new Promise<void>((resolve,reject)=>{img.onload=()=>resolve();img.onerror=()=>reject(new Error('Una imagen del proyecto está dañada.'));img.src=src});if(img.naturalWidth*img.naturalHeight>100_000_000)throw new Error('Imagen demasiado grande.');return img}
-      async function validateOriginal(d:EditorDocument){const img=await decode(d.original);if(d.crop&&(d.crop.x+d.crop.width>img.naturalWidth||d.crop.y+d.crop.height>img.naturalHeight))throw new Error('Recorte fuera de la imagen original.')}
-      const loaded:Asset[]=[]
-      for(const a of p.items){const img=await decode(a.dataUrl);if(img.naturalWidth!==a.naturalWidth||img.naturalHeight!==a.naturalHeight)throw new Error('Dimensiones de imagen inconsistentes.');if(a.document)await validateOriginal(a.document);loaded.push({...a,img:normalizeImage(img)})}
-      if(p.editor)await validateOriginal(p.editor.document)
-      setItems(loaded);setProjectName(p.name);setWidth(p.sheet.width);setHeight(p.sheet.height);setDpi(p.sheet.dpi);setGap(p.sheet.gap);setRotate(p.sheet.rotate);setPreviewBg(p.background);onPreviewColorChange?.(p.background);setAcceptedResolution('');restoreEditor?.(p.editor)
+      const loaded=await decodeProject(p)
+      applyProject(p,loaded)
       setMessage('Proyecto abierto. Resoluciones conservadas; revisa los avisos antes de exportar.')
     }catch(e){setError((e as Error).message)}finally{setProjectBusy(false)}
   }
@@ -84,34 +95,31 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
     // Preserve the editor's alpha choice.
     return normalized
   }
+  async function decodeProject(p:ProjectFile) {
+      async function decode(src:string){const img=new Image();await new Promise<void>((resolve,reject)=>{img.onload=()=>resolve();img.onerror=()=>reject(new Error('Una imagen del proyecto está dañada.'));img.src=src});if(img.naturalWidth*img.naturalHeight>100_000_000)throw new Error('Imagen demasiado grande.');return img}
+      async function validateOriginal(d:EditorDocument){const img=await decode(d.original);if(d.crop&&(d.crop.x+d.crop.width>img.naturalWidth||d.crop.y+d.crop.height>img.naturalHeight))throw new Error('Recorte fuera de la imagen original.')}
+      const loaded:Asset[]=[]
+      for(const a of p.items){const img=await decode(a.dataUrl);if(img.naturalWidth!==a.naturalWidth||img.naturalHeight!==a.naturalHeight)throw new Error('Dimensiones de imagen inconsistentes.');if(a.document)await validateOriginal(a.document);loaded.push({...a,img:normalizeImage(img)})}
+      if(p.editor)await validateOriginal(p.editor.document)
+
+    return loaded
+  }
+  function applyProject(p:ProjectFile,loaded:Asset[]) {
+    setItems(loaded);setProjectName(p.name);setWidth(p.sheet.width);setHeight(p.sheet.height);setDpi(p.sheet.dpi);setGap(p.sheet.gap);setRotate(p.sheet.rotate);setPreviewBg(p.background);onPreviewColorChange?.(p.background);setAcceptedResolution('');restoreEditor?.(p.editor)
+  }
   useEffect(() => {
-    let cancelled = false
-    try {
-      const saved = JSON.parse(localStorage.getItem(sheetStorageKey) || '[]') as SavedAsset[]
-      if (!Array.isArray(saved) || !saved.length) { restored.current = true; setSaveState('Sin diseños guardados'); return }
-      Promise.all(saved.map(entry => new Promise<Asset|null>(resolve => {
-        const img = new Image()
-        img.onload = () => resolve({id:entry.id,name:entry.name,img:normalizeImage(img),naturalWidth:img.naturalWidth,naturalHeight:img.naturalHeight,widthCm:entry.widthCm,heightCm:entry.heightCm,quantity:entry.quantity,document:entry.document})
-        img.onerror = () => resolve(null)
-        img.src = entry.dataUrl
-      }))).then(restoredItems => { if (!cancelled) setItems(previous => { const existing = new Set(previous.map(item => item.id)); return [...previous,...restoredItems.filter((item): item is Asset => item !== null && !existing.has(item.id))] }); restored.current = true }).catch(() => { restored.current = true })
-    } catch { restored.current = true }
-    return () => { cancelled = true }
-  }, [])
-  useEffect(()=>{try{localStorage.setItem('trama-dtf-project-name',projectName);localStorage.setItem('trama-dtf-sheet-settings',JSON.stringify({width,height,dpi,gap,rotate}))}catch{setSaveState('No guardado en navegador: descarga el proyecto')}},[projectName,width,height,dpi,gap,rotate])
+    let cancelled=false
+    void decodeProject(initialProject).then(loaded=>{
+      if(!cancelled){applyProject(initialProject,loaded);setHydrated(true)}
+    }).catch(e=>{
+      if(!cancelled){setError(e.message);setSaveState('No se pudo recuperar; guardado pausado');onSaveStatus({name:initialProject.name,message:'No se pudo recuperar el proyecto. Guardado pausado.',pending:false,failed:true})}
+    })
+    return ()=>{cancelled=true}
+  },[])
   useEffect(()=>{if(previewColor && previewColor !== previewBg) setPreviewBg(previewColor)},[previewColor])
-  useEffect(() => {
-    if (!restored.current) return
-    let cancelled = false
-    Promise.all(items.map(async item => {
-      const canvas = item.img instanceof HTMLCanvasElement ? item.img : null
-      if (!canvas) return null
-      return {id:item.id,name:item.name,dataUrl:canvas.toDataURL('image/png'),naturalWidth:item.naturalWidth,naturalHeight:item.naturalHeight,widthCm:item.widthCm,heightCm:item.heightCm,quantity:item.quantity,document:item.document} satisfies SavedAsset
-    })).then(saved => { if (!cancelled) { try { localStorage.setItem(sheetStorageKey,JSON.stringify(saved.filter(Boolean)));setSaveState('Guardado local') } catch { setSaveState('No guardado: almacenamiento lleno');setError('No se pudieron guardar los originales y diseños. Mantén esta pestaña abierta; los últimos cambios podrían perderse al cerrarla.') } } })
-    return () => { cancelled = true }
-  }, [items,projectName,width,height,dpi,gap,rotate])
 
   async function add(blob:Blob,name:string,widthCm?:number,document?:EditorDocument,replaceId?:string) {
+    setAssetLoading(n=>n+1)
     const img = new Image()
     const url = URL.createObjectURL(blob)
     try {
@@ -127,7 +135,7 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
         const next:Asset={id:crypto.randomUUID(),name,img:normalized,naturalWidth:img.naturalWidth,naturalHeight:img.naturalHeight,widthCm:w,heightCm:w*img.naturalHeight/img.naturalWidth,quantity:1,document}
         return updateGangAsset(previous,next,replaceId)
       })
-    } finally {URL.revokeObjectURL(url)}
+    } finally {URL.revokeObjectURL(url);setAssetLoading(n=>n-1)}
   }
   useEffect(() => {
     if (!source || imported.current === source.id) return
@@ -198,9 +206,8 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
       <label className="field">Nombre del trabajo<input aria-label="Nombre del trabajo" value={projectName} maxLength={80} onChange={e=>setProjectName(e.target.value)}/></label>
       <div className="field"><span>Presets de plancha</span><div className="scale-presets sheet-presets">{sheetPresets.map(([w,h,label])=><button key={label} aria-pressed={width===w && height===h} onClick={()=>{setWidth(w);setHeight(h)}}>{label}</button>)}</div></div>
       <div className="dimension-fields"><label>Ancho (cm)<input type="number" aria-label="Ancho de plancha" min="1" value={width} onChange={e=>setWidth(Number(e.target.value))}/></label><label>Alto (cm)<input type="number" aria-label="Alto de plancha" min="1" value={height} onChange={e=>setHeight(Number(e.target.value))}/></label></div>
-      <div className="dimension-fields"><button className="btn" disabled={projectBusy||busy} onClick={saveProject}>Guardar proyecto</button><button className="btn" disabled={projectBusy||busy} onClick={()=>projectInput.current?.click()}>Abrir proyecto</button></div>
       <input hidden ref={projectInput} type="file" accept=".json,.trama.json" onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)void openProject(file)}}/>
-      <p className="help-text">Archivo .trama.json con imágenes, originales disponibles y ajustes para continuar después. {projectBusy?'Procesando proyecto…':''}</p>
+      <p className="help-text">Autoguardado del proyecto completo en este navegador. Usa «Descargar proyecto» en la cabecera para una copia .trama.json. {projectBusy?'Procesando proyecto…':''}</p>
       <label className="field">Resolución<select aria-label="Resolución de plancha" value={dpi} onChange={e=>setDpi(Number(e.target.value))}><option value="150">150 ppp</option><option value="300">300 ppp</option><option value="600">600 ppp</option></select></label>
       <p className="help-text">PNG · sRGB · 8 bits por canal. Usa los mismos ppp del editor para conservar la trama.</p>
       {resolutionIssues.length>0 && <div className="resolution-warning" role="alert"><strong>Revisar resolución antes de exportar</strong><button className="btn" onClick={correctResolution}>Corregir resolución sin remuestrear</button><p>La plancha usa {dpi} ppp. Estos diseños cambiarían de píxeles al tamaño elegido:</p><ul>{resolutionIssues.map(item=><li key={item.id}>{item.name}: {Math.round(resolutionCheck(item,dpi).effectiveDpi)} ppp efectivos → {dpi} ppp.</li>)}</ul><p>Reducir puede perder detalle; ampliar no recupera detalle y puede alterar la trama. Para cambiar los ppp, vuelve al original y genera la trama en el editor.</p>{matchingDpi && matchingDpi!==dpi && <button className="btn" onClick={()=>setDpi(matchingDpi)}>Igualar plancha a {matchingDpi} ppp</button>}<label><input type="checkbox" checked={acceptedResolution===resolutionKey} onChange={e=>setAcceptedResolution(e.target.checked?resolutionKey:'')}/> Acepto reescalar estos diseños para esta exportación.</label></div>}

@@ -1,6 +1,6 @@
 import type {Settings} from './App'
 import type {CropRect} from './crop'
-export type EditorDocument={version:1;original:string;settings:Settings;crop:CropRect|null;widthCm:number;dpi:number}
+export type EditorDocument={version:1;original:string;settings:Settings;crop:CropRect|null;widthCm:number;dpi:number;garment?:'dark'|'light'}
 export type GangSource={id:number;blob:Blob;widthCm:number;name:string;document:EditorDocument;replaceId?:string}
 
 export function updateGangAsset<T extends {id:string;quantity:number}>(items:T[],next:T,replaceId?:string):T[] {

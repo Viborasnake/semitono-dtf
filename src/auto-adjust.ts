@@ -1,7 +1,7 @@
 export type AutoAdjustSettings = {
   autoTone?: boolean; autoContrast?: boolean; autoColor?: boolean
   temperature?: number; tint?: number; autoColorStrength?: number; autoToneStrength?: number; autoContrastStrength?: number
-  background: 'black' | 'white' | 'none'; tolerance: number; whiteCutoff: number
+  background: 'black' | 'white' | 'none' | 'custom'; tolerance: number; whiteCutoff: number
 }
 
 // Deterministic, non-destructive corrections. Always derive them from the

@@ -2,6 +2,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { halftone } from './halftone.ts'
 import type { HalftoneSettings } from './halftone.ts'
+import {whiteGarmentHalftone} from './white-garment.ts'
 const settings: HalftoneSettings = { lpi: 30, angle: 22.5, shape: 'circle', size: 100, contrast: 100, brightness: 100, whiteCutoff: 245, preserveColor: true, invert: false, background: 'black', tolerance: 25 }
 function image(r: number, g: number, b: number, a = 255) {
   const data = new Uint8ClampedArray(64 * 64 * 4)
@@ -31,6 +32,96 @@ test('white mode removes white and keeps black', () => {
   const s = {...settings, background: 'white' as const}
   assert.equal(halftone(image(255,255,255),64,64,s).transparent,100)
   assert.equal(halftone(image(0,0,0),64,64,s).transparent,0)
+})
+test('white garment preset produces real dots and preserves mean tone on white at each output DPI',()=>{
+  const side=256
+  const colors=[[128,128,128],[60,45,30],[235,25,15],[245,236,210],[230,145,145]]
+  for(const dpi of [150,300,600])for(const lpi of [32,65])for(const rgb of colors){
+    const data=new Uint8ClampedArray(side*side*4)
+    for(let i=0;i<data.length;i+=4)data.set([...rgb,255],i)
+    const out=halftone(data,side,side,{...settings,...whiteGarmentHalftone,dpi,lpi}).data
+    let holes=0,ink=0;const totals=[0,0,0]
+    for(let i=0;i<out.length;i+=4){
+      const a=out[i+3]/255
+      assert.ok(a===0||a===1)
+      if(a)ink++;else holes++
+      for(let c=0;c<3;c++)totals[c]+=out[i+c]*a+255*(1-a)
+    }
+    assert.ok(holes>0&&ink>0,`No dots for ${rgb} at ${dpi}/${lpi}`)
+    for(let c=0;c<3;c++)assert.ok(Math.abs(totals[c]/(side*side)-rgb[c])<3,`Tone shift for ${rgb} at ${dpi}/${lpi}: ${totals[c]/(side*side)}`)
+  }
+})
+test('solid and antialiased screening keep comparable mean coverage instead of inflating dots',()=>{
+  const side=256,data=new Uint8ClampedArray(side*side*4)
+  for(let i=0;i<data.length;i+=4)data.set([128,128,128,255],i)
+  for(const shape of ['circle','square','line'] as const){
+    const means=[true,false].map(solidAlpha=>{
+      const out=halftone(data,side,side,{...settings,...whiteGarmentHalftone,whiteDetail:0,lpi:65,shape,solidAlpha}).data
+      let sum=0;for(let i=3;i<out.length;i+=4)sum+=255-out[i]
+      return sum/(side*side)
+    })
+    assert.ok(Math.abs(means[0]-128)<2);assert.ok(Math.abs(means[0]-means[1])<2)
+  }
+})
+test('white detail reduces broken fine lines and pixel error while keeping binary alpha',()=>{
+  const side=256,data=new Uint8ClampedArray(side*side*4).fill(255)
+  for(let y=8;y<side-8;y++)for(let x=8;x<side-8;x++){
+    if(x%4===0||x===y)data.set([150,125,100,255],(y*side+x)*4)
+  }
+  const metrics=[0,70,100].map(whiteDetail=>{
+    const out=halftone(data,side,side,{...settings,...whiteGarmentHalftone,whiteDetail}).data
+    let lost=0,error=0
+    for(let i=0;i<data.length;i+=4){
+      const a=out[i+3]/255;assert.ok(a===0||a===1)
+      if(data[i]===255){assert.equal(a,0);continue}
+      if(!a)lost++
+      for(let c=0;c<3;c++)error+=(out[i+c]*a+255*(1-a)-data[i+c])**2
+    }
+    return {lost,error}
+  })
+  for(let i=1;i<metrics.length;i++){
+    assert.ok(metrics[i].lost<metrics[i-1].lost)
+    assert.ok(metrics[i].error<metrics[i-1].error)
+    // Detail improves continuity, but even 100% must still screen midtones.
+    assert.ok(metrics[i].lost>0)
+  }
+})
+test('white screening retains tonal coverage instead of a near-solid floor at high detail',()=>{
+  const side=256,tones=[255,230,191,128,64,0]
+  for(const dpi of [150,300,600])for(const whiteDetail of [0,30,90,100])for(const shape of ['circle','square','line'] as const){
+    const coverages=tones.map(tone=>{
+      const data=new Uint8ClampedArray(side*side*4)
+      for(let i=0;i<data.length;i+=4)data.set([tone,tone,tone,255],i)
+      const out=halftone(data,side,side,{...settings,...whiteGarmentHalftone,dpi,lpi:35,shape,whiteDetail}).data
+      let ink=0;for(let i=3;i<out.length;i+=4)ink+=out[i]/255
+      const coverage=ink/(side*side),base=1-tone/255
+      assert.ok(Math.abs(coverage-(base+base*(1-base)*whiteDetail/100))<.015)
+      return coverage
+    })
+    assert.equal(coverages[0],0);assert.equal(coverages.at(-1),1)
+    assert.ok(coverages[1]<.2,'Pale tones must not become almost-solid ink')
+    for(let i=1;i<coverages.length;i++)assert.ok(coverages[i]>coverages[i-1]+.05)
+  }
+})
+test('detail compensation keeps average colors over white at every strength',()=>{
+  const side=256
+  for(const rgb of [[128,128,128],[60,45,30],[230,145,145],[245,236,210]]){
+    const data=new Uint8ClampedArray(side*side*4)
+    for(let i=0;i<data.length;i+=4)data.set([...rgb,255],i)
+    for(const whiteDetail of [0,40,70,100]){
+      const out=halftone(data,side,side,{...settings,...whiteGarmentHalftone,whiteDetail}).data
+      const means=[0,0,0]
+      for(let i=0;i<out.length;i+=4)for(let c=0;c<3;c++)means[c]+=out[i+c]*out[i+3]/255+255-out[i+3]
+      for(let c=0;c<3;c++)assert.ok(Math.abs(means[c]/(side*side)-rgb[c])<2)
+    }
+  }
+})
+test('white detail does not affect black, no-removal or connected-white output',()=>{
+  const data=image(140,100,65)
+  for(const background of ['black','none','white'] as const){
+    const base={...settings,background,whiteRemoval:'connected' as const}
+    assert.deepEqual(halftone(data,64,64,{...base,whiteDetail:100}).data,halftone(data,64,64,base).data)
+  }
 })
 test('connected white removal preserves enclosed fur, cream details and saturated ink',()=>{
   const data=image(250,248,245)
