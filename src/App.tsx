@@ -144,8 +144,6 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [projectCollapsed,setProjectCollapsed]=useState(true)
   const sourceCanvas = useRef<HTMLCanvasElement>(null)
   const resultCanvas = useRef<HTMLCanvasElement>(null)
-  const sizePanel = useRef<HTMLElement>(null)
-  const halftonePanel = useRef<HTMLElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLImageElement | null>(null)
   const [settings, setSettings] = useState(initialSettings)
@@ -605,9 +603,9 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       </div>
 
       <nav className="tool-tabs" aria-label="Flujo de trabajo">
-        <button className={`workflow-step ${workflowStep === 1 ? 'active' : ''}`} aria-current={workflowStep === 1 ? 'step' : undefined} onClick={() => { setWorkflowStep(1); setTool('design'); setCollapsedPanels(s => ({...s, size:false})); requestAnimationFrame(() => sizePanel.current?.scrollIntoView({behavior:'smooth',block:'start'})) }}><b>1</b><span>Tamaño</span></button>
+        <button className={`workflow-step ${workflowStep === 1 ? 'active' : ''}`} aria-current={workflowStep === 1 ? 'step' : undefined} onClick={() => { setWorkflowStep(1); setTool('design'); setCollapsedPanels(s => ({...s, size:false})) }}><b>1</b><span>Tamaño</span></button>
         <i className="workflow-connector" aria-hidden="true" />
-        <button className={`workflow-step ${workflowStep === 2 ? 'active' : ''}`} aria-current={workflowStep === 2 ? 'step' : undefined} onClick={() => { setWorkflowStep(2); setTool('design'); setCollapsedPanels(s => ({...s, trama:false})); requestAnimationFrame(() => halftonePanel.current?.scrollIntoView({behavior:'smooth',block:'start'})) }}><b>2</b><span>Semitono</span></button>
+        <button className={`workflow-step ${workflowStep === 2 ? 'active' : ''}`} aria-current={workflowStep === 2 ? 'step' : undefined} onClick={() => { setWorkflowStep(2); setTool('design'); setCollapsedPanels(s => ({...s, trama:false})) }}><b>2</b><span>Semitono</span></button>
         <i className="workflow-connector" aria-hidden="true" />
         <button className={`workflow-step ${workflowStep === 3 ? 'active' : ''}`} aria-current={workflowStep === 3 ? 'step' : undefined} onClick={() => { setWorkflowStep(3); setTool('gang') }}><b>3</b><span>Gang Sheet</span></button>
         <span>Todo se procesa en tu equipo</span>
@@ -637,7 +635,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             {presetMessage && <p className="help-text" role="status">{presetMessage}</p>}
           </div></section>
 
-          <section ref={sizePanel} className={`control-card ${collapsedPanels.size ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.size} aria-controls="size-controls" onClick={()=>setCollapsedPanels(s=>({...s,size:!s.size}))}><span>Tamaño de impresión</span><ChevronDown size={17}/></button><div className="section-body" id="size-controls" hidden={collapsedPanels.size}>
+          <section className={`control-card ${collapsedPanels.size ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.size} aria-controls="size-controls" onClick={()=>setCollapsedPanels(s=>({...s,size:!s.size}))}><span>Tamaño de impresión</span><ChevronDown size={17}/></button><div className="section-body" id="size-controls" hidden={collapsedPanels.size}>
             <button className="btn" disabled={loading} onClick={()=>setShowCrop(true)}>Recortar imagen (Crop)</button>
             <button className="btn" disabled={loading||!fileName||!output} onClick={trimToContent}>Recortar al contenido</button>
             <p className="help-text">Quita márgenes transparentes del original, sin ampliar el diseño. Conserva los huecos internos. Puedes deshacer el recorte.</p>{cropMessage&&<p className="help-text" role="status">{cropMessage}</p>}
@@ -676,7 +674,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <p className="help-text">«Vista sobre» cambia solo la previsualización. La eliminación de fondo se elige aquí.</p>
           </div></section>
 
-          <section ref={halftonePanel} hidden={!settings.enabled} className={`control-card ${collapsedPanels.trama ? '' : 'open'}`}>
+          <section hidden={!settings.enabled} className={`control-card ${collapsedPanels.trama ? '' : 'open'}`}>
             <button className="section-heading" aria-expanded={!collapsedPanels.trama} aria-controls="trama-controls" onClick={() => setCollapsedPanels(s=>({...s,trama:!s.trama}))}><span><CircleDot size={17} /> Semitono</span><ChevronDown size={17} /></button>
             <div className="section-body" id="trama-controls" hidden={collapsedPanels.trama}>
               <RangeControl label="Frecuencia" value={settings.lpi} min={12} max={65} unit=" LPI" onChange={(v) => update('lpi', v)} />
