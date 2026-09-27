@@ -359,7 +359,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       setWidthCm((physicalWidth ?? img.naturalWidth / sourceDpi * 2.54).toFixed(4))
       setDpi(sourceDpi)
       setFileName(name)
-      setWorkflowStep(2)
+      setWorkflowStep(1)
       setError('')
       setExportMessage('')
       setLoading(false)
