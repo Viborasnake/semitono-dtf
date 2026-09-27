@@ -354,7 +354,7 @@ input[type=checkbox] { accent-color:var(--aqua); }
 .resolution-warning { padding:12px; border:1px solid #976d38; border-radius:8px; color:#f1d4a6; background:#292115; font-size:12px; line-height:1.5; overflow-wrap:anywhere; }
 .resolution-warning ul { padding-left:18px; }
 .resolution-warning label { display:block; margin-top:12px; }
-.prepress-toggle { height:30px; padding:0 9px; font-size:11px; }
+.prepress-toggle { width:38px; height:30px; padding:0; justify-content:center; gap:3px; font-size:11px; }
 
 /* Shared editor toolbar controls. */
 .app-shell { display:flex; flex-direction:column; height:100dvh; min-height:0; overflow:hidden; }

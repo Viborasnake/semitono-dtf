@@ -15,7 +15,7 @@ import {createHistory,recordHistory,moveHistory,type History} from './history'
 import CropPanel, {type CropRect} from './CropPanel'
 import ColorRangePanel from './ColorRangePanel'
 import {defaultColorRange,validColorRange,type ColorRange} from './color-range'
-import { Check, ChevronDown, CircleDot, Download, FolderOpen, Hand, Image as ImageIcon, Info, Layers3, Minus, Pipette, Plus, RotateCcw, SlidersHorizontal, Sparkles, Trash2, Upload, ZoomIn } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleDot, Download, FolderOpen, Hand, Image as ImageIcon, Info, Layers3, Minus, Pipette, Plus, RotateCcw, SlidersHorizontal, Sparkles, Trash2, Upload, ZoomIn } from 'lucide-react'
 
 type Shape = 'circle' | 'square' | 'line'
 type ViewMode = 'result' | 'split' | 'original'
@@ -731,7 +731,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
 
         <section className={`stage ${dragging ? 'dragging' : ''}`} onDragOver={(e) => { e.preventDefault(); setDragging(true) }} onDragLeave={() => setDragging(false)} onDrop={(e) => { e.preventDefault(); setDragging(false); handleFile(e.dataTransfer.files[0]) }}>
           <div className="stage-toolbar" hidden={!fileName}>
-            <button className="btn prepress-toggle" aria-expanded={!prepressCollapsed} aria-controls="prepress-panel" onClick={()=>setPrepressCollapsed(v=>!v)} title={prepressCollapsed?'Mostrar controles de Pre-prensa':'Ocultar controles de Pre-prensa'}><SlidersHorizontal size={15}/>{prepressCollapsed?'Mostrar Pre-prensa':'Ocultar Pre-prensa'}</button>
+            <button className="btn prepress-toggle" aria-label={prepressCollapsed?'Mostrar controles de Pre-prensa':'Ocultar controles de Pre-prensa'} aria-expanded={!prepressCollapsed} aria-controls="prepress-panel" onClick={()=>setPrepressCollapsed(v=>!v)} title={prepressCollapsed?'Mostrar controles de Pre-prensa':'Ocultar controles de Pre-prensa'}>{prepressCollapsed?<ChevronRight size={18}/>:<ChevronLeft size={18}/>}</button>
             <div className="history-controls" role="group" aria-label="Historial de ajustes">
               <button className="btn" disabled={loading||!historyCounts.undo} onClick={()=>navigateHistory('undo')} title="Deshacer (⌘/Ctrl Z)">↶ Deshacer</button>
               <button className="btn" disabled={loading||!historyCounts.redo} onClick={()=>navigateHistory('redo')} title="Rehacer (⌘/Ctrl Shift Z)">↷ Rehacer</button>
