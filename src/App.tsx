@@ -471,6 +471,29 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     finally { setExporting(false) }
   }
 
+  const exportResizedPng = async () => {
+    const canvas = sourceCanvas.current
+    if (!canvas || !output || readyKey !== renderKey || loading || exporting) return
+    setExporting(true)
+    setExportMessage('')
+    try {
+      const blob = await new Promise<Blob>((resolve, reject) => canvas.toBlob(b => b ? resolve(b) : reject(new Error('No se pudo generar la imagen reescalada.')), 'image/png'))
+      const bytes = withCanvasPrintProfile(new Uint8Array(await blob.arrayBuffer()), dpi)
+      const metadata = inspectPng(bytes)
+      if (metadata.width !== output.width || metadata.height !== output.height || Math.abs(metadata.dpi - dpi) > .02 || Math.abs(metadata.dpiY - dpi) > .02 || metadata.profile !== 'sRGB') throw new Error('La imagen reescalada no coincide con el tamaño solicitado.')
+      const url = URL.createObjectURL(new Blob([bytes], { type: 'image/png' }))
+      const link = document.createElement('a')
+      link.download = `${fileName.replace(/\.[^.]+$/, '')}-reescalada-${output.width}x${output.height}-${dpi}ppp.png`
+      link.href = url
+      document.body.append(link)
+      link.click()
+      link.remove()
+      setTimeout(() => URL.revokeObjectURL(url), 60000)
+      setExportMessage(`Imagen reescalada verificada: ${metadata.width} × ${metadata.height} px · ${dpi} ppp. Descarga solicitada.`)
+    } catch (e) { setError((e as Error).message) }
+    finally { setExporting(false) }
+  }
+
   const snapshotEditor = () => {
     if(loading)throw new Error('Espera a que termine de cargar la imagen antes de guardar.')
     if(!imageRef.current)return undefined
@@ -532,7 +555,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           </div>
         </div>
         <div className="top-actions">
-          {fileName && tool === 'design' && <><button className="btn gang-send" title="Añadir el diseño procesado y abrir la plancha" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={sendToGang}><Layers3 size={16}/><span>{editingAssetId?'Actualizar en Gang Sheet':'Enviar a Gang Sheet'}</span></button><button className="btn export" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={exportPng}><Download size={17} /> {exporting ? 'Exportando…' : 'Exportar PNG'}</button></>}
+          {fileName && tool === 'design' && <><button className="btn gang-send" title="Añadir el diseño procesado y abrir la plancha" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={sendToGang}><Layers3 size={16}/><span>{editingAssetId?'Actualizar en Gang Sheet':'Enviar a Gang Sheet'}</span></button><button className="btn" title="Descargar la imagen reescalada sin semitono" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={exportResizedPng}><ImageIcon size={16} /> Descargar reescalada</button><button className="btn export" title="Descargar la imagen semitoneada" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={exportPng}><Download size={17} /> {exporting ? 'Exportando…' : 'Exportar PNG'}</button></>}
         </div>
       </header>
       <div className="project-toolbar" id="project-actions" role="group" aria-label="Acciones del proyecto" hidden={projectCollapsed}>
