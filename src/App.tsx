@@ -144,6 +144,8 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [projectCollapsed,setProjectCollapsed]=useState(true)
   const sourceCanvas = useRef<HTMLCanvasElement>(null)
   const resultCanvas = useRef<HTMLCanvasElement>(null)
+  const sizePanel = useRef<HTMLElement>(null)
+  const halftonePanel = useRef<HTMLElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLImageElement | null>(null)
   const [settings, setSettings] = useState(initialSettings)
@@ -162,6 +164,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const handActive = handTool || spaceHeld
   const [viewport, setViewport] = useState({width: 600, height: 600})
   const [tool, setTool] = useState<'design' | 'gang'>('design')
+  const [workflowStep, setWorkflowStep] = useState<1 | 2 | 3>(1)
   const [preset, setPreset] = useState('default')
   const [savedPresets, setSavedPresets] = useState<SavedPreset[]>(readSavedPresets)
   const [savingPreset, setSavingPreset] = useState(false)
@@ -356,6 +359,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       setWidthCm((physicalWidth ?? img.naturalWidth / sourceDpi * 2.54).toFixed(4))
       setDpi(sourceDpi)
       setFileName(name)
+      setWorkflowStep(2)
       setError('')
       setExportMessage('')
       setLoading(false)
@@ -550,7 +554,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     const replaceId=editingAssetId
     setExporting(true)
     resultCanvas.current?.toBlob(async blob => {
-      try {if(!blob)throw new Error('No se pudo generar el diseño.');const tagged=new Blob([withCanvasPrintProfile(new Uint8Array(await blob.arrayBuffer()),sourceDpi)],{type:'image/png'});setGangSource({id: Date.now(), blob:tagged, widthCm: width, name,document:editorDocument,replaceId});setTool('gang')}
+      try {if(!blob)throw new Error('No se pudo generar el diseño.');const tagged=new Blob([withCanvasPrintProfile(new Uint8Array(await blob.arrayBuffer()),sourceDpi)],{type:'image/png'});setGangSource({id: Date.now(), blob:tagged, widthCm: width, name,document:editorDocument,replaceId});setWorkflowStep(3);setTool('gang')}
       catch(e){setError((e as Error).message)}finally{setExporting(false)}
     }, 'image/png')
   }
@@ -601,11 +605,11 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       </div>
 
       <nav className="tool-tabs" aria-label="Flujo de trabajo">
-        <button className={`workflow-step ${tool === 'design' && !fileName ? 'active' : ''}`} aria-current={tool === 'design' && !fileName ? 'step' : undefined} onClick={() => { setTool('design'); setCollapsedPanels(s => ({...s, size:false})) }}><b>1</b><span>Tamaño</span></button>
+        <button className={`workflow-step ${workflowStep === 1 ? 'active' : ''}`} aria-current={workflowStep === 1 ? 'step' : undefined} onClick={() => { setWorkflowStep(1); setTool('design'); setCollapsedPanels(s => ({...s, size:false})); requestAnimationFrame(() => sizePanel.current?.scrollIntoView({behavior:'smooth',block:'start'})) }}><b>1</b><span>Tamaño</span></button>
         <i className="workflow-connector" aria-hidden="true" />
-        <button className={`workflow-step ${tool === 'design' && !!fileName ? 'active' : ''}`} aria-current={tool === 'design' && !!fileName ? 'step' : undefined} onClick={() => { setTool('design'); setCollapsedPanels(s => ({...s, trama:false})) }}><b>2</b><span>Semitono</span></button>
+        <button className={`workflow-step ${workflowStep === 2 ? 'active' : ''}`} aria-current={workflowStep === 2 ? 'step' : undefined} onClick={() => { setWorkflowStep(2); setTool('design'); setCollapsedPanels(s => ({...s, trama:false})); requestAnimationFrame(() => halftonePanel.current?.scrollIntoView({behavior:'smooth',block:'start'})) }}><b>2</b><span>Semitono</span></button>
         <i className="workflow-connector" aria-hidden="true" />
-        <button className={`workflow-step ${tool === 'gang' ? 'active' : ''}`} aria-current={tool === 'gang' ? 'step' : undefined} onClick={() => setTool('gang')}><b>3</b><span>Gang Sheet</span></button>
+        <button className={`workflow-step ${workflowStep === 3 ? 'active' : ''}`} aria-current={workflowStep === 3 ? 'step' : undefined} onClick={() => { setWorkflowStep(3); setTool('gang') }}><b>3</b><span>Gang Sheet</span></button>
         <span>Todo se procesa en tu equipo</span>
       </nav>
       <div className="gang-container" style={{display: tool === 'gang' ? 'block' : 'none'}}><GangSheet source={gangSource} onImportFile={requestImport} onEditDocument={editGangDocument} previewColor={previewBg} onPreviewColorChange={setPreviewBg} getEditor={snapshotEditor} restoreEditor={restoreProjectEditor} initialProject={initialProject} editorRevision={JSON.stringify([renderKey,fileName,editingAssetId,activeGarment])} editorLoading={loading} onSaveStatus={setProjectStatus} actionsRef={projectActions}/></div>
@@ -633,7 +637,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             {presetMessage && <p className="help-text" role="status">{presetMessage}</p>}
           </div></section>
 
-          <section className={`control-card ${collapsedPanels.size ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.size} aria-controls="size-controls" onClick={()=>setCollapsedPanels(s=>({...s,size:!s.size}))}><span>Tamaño de impresión</span><ChevronDown size={17}/></button><div className="section-body" id="size-controls" hidden={collapsedPanels.size}>
+          <section ref={sizePanel} className={`control-card ${collapsedPanels.size ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.size} aria-controls="size-controls" onClick={()=>setCollapsedPanels(s=>({...s,size:!s.size}))}><span>Tamaño de impresión</span><ChevronDown size={17}/></button><div className="section-body" id="size-controls" hidden={collapsedPanels.size}>
             <button className="btn" disabled={loading} onClick={()=>setShowCrop(true)}>Recortar imagen (Crop)</button>
             <button className="btn" disabled={loading||!fileName||!output} onClick={trimToContent}>Recortar al contenido</button>
             <p className="help-text">Quita márgenes transparentes del original, sin ampliar el diseño. Conserva los huecos internos. Puedes deshacer el recorte.</p>{cropMessage&&<p className="help-text" role="status">{cropMessage}</p>}
@@ -672,7 +676,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <p className="help-text">«Vista sobre» cambia solo la previsualización. La eliminación de fondo se elige aquí.</p>
           </div></section>
 
-          <section hidden={!settings.enabled} className={`control-card ${collapsedPanels.trama ? '' : 'open'}`}>
+          <section ref={halftonePanel} hidden={!settings.enabled} className={`control-card ${collapsedPanels.trama ? '' : 'open'}`}>
             <button className="section-heading" aria-expanded={!collapsedPanels.trama} aria-controls="trama-controls" onClick={() => setCollapsedPanels(s=>({...s,trama:!s.trama}))}><span><CircleDot size={17} /> Semitono</span><ChevronDown size={17} /></button>
             <div className="section-body" id="trama-controls" hidden={collapsedPanels.trama}>
               <RangeControl label="Frecuencia" value={settings.lpi} min={12} max={65} unit=" LPI" onChange={(v) => update('lpi', v)} />
