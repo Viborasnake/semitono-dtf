@@ -248,6 +248,13 @@ input[type=checkbox] { accent-color:var(--aqua); }
 .gang-viewport canvas { position:sticky; top:0; left:0; display:block; max-width:none; max-height:none; }
 .save-indicator { margin-left:auto; color:#70b99d; font-size:10px; font-weight:500; text-transform:none; letter-spacing:0; }
 .import-adjust { justify-content:center; }
+.compact-help { margin-top:6px; color:#8ea39a; font-size:10px; }
+.compact-help summary { cursor:pointer; color:#9fb5aa; list-style:none; }
+.compact-help summary::-webkit-details-marker { display:none; }
+.compact-help summary::before { content:'▸'; display:inline-block; width:13px; color:var(--aqua); }
+.compact-help[open] summary::before { content:'▾'; }
+.compact-help .help-text { margin:6px 0 0; }
+.field-hint { display:block; margin-top:-5px; color:#81968c; font-size:10px; line-height:1.35; }
 .sheet-presets { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; }
 .sheet-preset { min-width:0; display:flex; gap:3px; }
 .sheet-preset > button:first-child { min-width:0; flex:1; min-height:52px; padding:6px 4px; border:1px solid #355b4b; border-radius:5px; background:#162a21; color:#bcf5dc; line-height:1.15; font-size:11px; font-weight:700; white-space:normal; cursor:pointer; }
