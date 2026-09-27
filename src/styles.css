@@ -146,7 +146,11 @@ input[type='range']::-webkit-slider-thumb { width: 13px; height: 13px; appearanc
 
 .tool-tabs { height:42px; display:flex; align-items:center; gap:6px; padding:0 18px; border-bottom:1px solid var(--line); background:#101316; }
 .tool-tabs button { border:0; border-radius:6px; padding:7px 12px; background:transparent; color:#8c9792; cursor:pointer; font-size:12px; }
-.tool-tabs button.active { background:#223c35; color:var(--aqua); }
+.workflow-step { display:flex; align-items:center; gap:7px; }
+.workflow-step b { width:20px; height:20px; display:grid; place-items:center; border:1px solid #4a5550; border-radius:50%; color:#aab7b1; font-size:11px; }
+.workflow-step.active { background:#223c35; color:var(--aqua); }
+.workflow-step.active b { border-color:var(--aqua); color:var(--aqua); }
+.workflow-connector { width:24px; height:1px; background:#35403c; }
 .tool-tabs span { margin-left:auto; font-size:11px; color:#727d77; }
 .section-body select,.section-body input[type=number] { width:100%; min-width:0; padding:8px; background:#0b0e11; color:#e4ece8; border:1px solid #35413b; border-radius:6px; }
 .dimension-fields { display:grid; grid-template-columns:1fr 1fr; gap:10px; }

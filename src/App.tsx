@@ -600,7 +600,14 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
         {fileName && tool === 'design' && <button className="btn ghost reset-adjustments" onClick={() => {setSettings(initialSettings); setGarment('dark'); setPreset('default');setPreviewBg('black')}}><RotateCcw size={15} /> Restablecer ajustes</button>}
       </div>
 
-      <nav className="tool-tabs"><button className={tool === 'design' ? 'active' : ''} onClick={() => setTool('design')}>Editor de semitonos</button><button className={tool === 'gang' ? 'active' : ''} onClick={() => setTool('gang')}>Gang Sheet</button><span>Todo se procesa en tu equipo</span></nav>
+      <nav className="tool-tabs" aria-label="Flujo de trabajo">
+        <button className={`workflow-step ${tool === 'design' && !fileName ? 'active' : ''}`} aria-current={tool === 'design' && !fileName ? 'step' : undefined} onClick={() => { setTool('design'); setCollapsedPanels(s => ({...s, size:false})) }}><b>1</b><span>Tamaño</span></button>
+        <i className="workflow-connector" aria-hidden="true" />
+        <button className={`workflow-step ${tool === 'design' && !!fileName ? 'active' : ''}`} aria-current={tool === 'design' && !!fileName ? 'step' : undefined} onClick={() => { setTool('design'); setCollapsedPanels(s => ({...s, trama:false})) }}><b>2</b><span>Semitono</span></button>
+        <i className="workflow-connector" aria-hidden="true" />
+        <button className={`workflow-step ${tool === 'gang' ? 'active' : ''}`} aria-current={tool === 'gang' ? 'step' : undefined} onClick={() => setTool('gang')}><b>3</b><span>Gang Sheet</span></button>
+        <span>Todo se procesa en tu equipo</span>
+      </nav>
       <div className="gang-container" style={{display: tool === 'gang' ? 'block' : 'none'}}><GangSheet source={gangSource} onImportFile={requestImport} onEditDocument={editGangDocument} previewColor={previewBg} onPreviewColorChange={setPreviewBg} getEditor={snapshotEditor} restoreEditor={restoreProjectEditor} initialProject={initialProject} editorRevision={JSON.stringify([renderKey,fileName,editingAssetId,activeGarment])} editorLoading={loading} onSaveStatus={setProjectStatus} actionsRef={projectActions}/></div>
       <main className={`workspace ${prepressCollapsed || !fileName ? 'prepress-collapsed' : ''} ${!fileName ? 'empty-editor' : ''}`} style={{display: tool === 'design' ? undefined : 'none'}}>
         <aside className="sidebar" id="prepress-panel" hidden={prepressCollapsed || !fileName}>
