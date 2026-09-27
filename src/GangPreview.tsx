@@ -3,9 +3,9 @@ import {Hand, Minus, Plus, ZoomIn} from 'lucide-react'
 import type {Placement} from './packing'
 import {hitGangAsset} from './gang-selection'
 
-type Props = {width:number;height:number;dpi:number;background:string;placements:Placement[];items:{id:string;img:CanvasImageSource;widthCm:number;heightCm:number}[];selectedId?:string|null;onSelect?:(id:string|null)=>void;onEdit?:(id:string)=>void}
+type Props = {width:number;height:number;dpi:number;background:string;placements:Placement[];items:{id:string;img:CanvasImageSource;widthCm:number;heightCm:number}[];selectedId?:string|null;onSelect?:(id:string|null)=>void;onEdit?:(id:string)=>void;status?:string}
 
-export default function GangPreview({width,height,dpi,background,placements,items,selectedId,onSelect,onEdit}:Props) {
+export default function GangPreview({width,height,dpi,background,placements,items,selectedId,onSelect,onEdit,status}:Props) {
   const viewport=useRef<HTMLDivElement>(null)
   const canvas=useRef<HTMLCanvasElement>(null)
   const [size,setSize]=useState({width:1,height:1})
@@ -95,14 +95,18 @@ export default function GangPreview({width,height,dpi,background,placements,item
     <div className={`gang-viewport ${handActive?'hand-active':''}`} ref={viewport} tabIndex={0} aria-label="Plancha con desplazamiento horizontal y vertical" onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={stopDrag} onPointerCancel={stopDrag} onLostPointerCapture={stopDrag} onScroll={e=>setScroll({x:e.currentTarget.scrollLeft,y:e.currentTarget.scrollTop})}>
       <div style={{width:areaW,height:areaH}}><canvas ref={canvas} style={{width:size.width,height:size.height,cursor:'pointer'}} aria-label="Vista previa del Gang Sheet. Clic para seleccionar, doble clic para editar." onClick={e=>onSelect?.(pick(e.clientX,e.clientY))} onDoubleClick={e=>{const id=pick(e.clientX,e.clientY);if(id)onEdit?.(id)}}/></div>
     </div>
-    <div className="gang-zoom zoom-control" role="group" aria-label="Zoom del Gang Sheet">
-      <button className="hand-button" aria-label="Mano para mover la plancha" aria-pressed={handActive} title="Mano: arrastra para mover la plancha" onClick={()=>setHandActive(v=>!v)}><Hand size={16}/></button>
-      <ZoomIn size={15}/>
-      <button aria-label="Alejar Gang Sheet" onClick={()=>changeZoom(scale/1.25)}><Minus size={14}/></button>
-      <span>{(scale*100).toFixed(1)}%</span>
-      <button aria-label="Acercar Gang Sheet" onClick={()=>changeZoom(scale*1.25)}><Plus size={14}/></button>
-      <button className="zoom-text" aria-pressed={zoom===null} onClick={()=>changeZoom(null)}>Ajustar</button>
-      <button className="zoom-text" aria-pressed={zoom===1} onClick={()=>changeZoom(1)}>100%</button>
+    <div className="gang-statusbar">
+      <div><span className="status-dot" /> Vista previa en tiempo real</div>
+      <div className="gang-zoom zoom-control" role="group" aria-label="Zoom del Gang Sheet">
+        <button className="hand-button" aria-label="Mano para mover la plancha" aria-pressed={handActive} title="Mano: arrastra para mover la plancha" onClick={()=>setHandActive(v=>!v)}><Hand size={16}/></button>
+        <ZoomIn size={15}/>
+        <button aria-label="Alejar Gang Sheet" onClick={()=>changeZoom(scale/1.25)}><Minus size={14}/></button>
+        <span>{(scale*100).toFixed(1)}%</span>
+        <button aria-label="Acercar Gang Sheet" onClick={()=>changeZoom(scale*1.25)}><Plus size={14}/></button>
+        <button className="zoom-text" aria-pressed={zoom===null} onClick={()=>changeZoom(null)}>Ajustar</button>
+        <button className="zoom-text" aria-pressed={zoom===1} onClick={()=>changeZoom(1)}>100%</button>
+      </div>
+      <div className="gang-format">{status || `PNG · ${background==='checker'?'Fondo transparente':`Vista sobre ${background}`}`}</div>
     </div>
   </div>
 }
