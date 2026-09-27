@@ -21,6 +21,15 @@ button { color: inherit; }
 .file-pill small { color: #636970; padding-left: 9px; border-left: 1px solid #2b2e33; }
 .status-dot { width: 7px; height: 7px; display: inline-block; flex: 0 0 7px; border-radius: 50%; background: var(--aqua); box-shadow: 0 0 8px #23d9b8; }
 .top-actions { display: flex; gap: 9px; }
+.export-dropdown { position: relative; }
+.export-trigger { min-width: 142px; justify-content: center; }
+.export-menu { position: absolute; top: calc(100% + 7px); right: 0; z-index: 40; min-width: 245px; padding: 6px; border: 1px solid #35413d; border-radius: 10px; background: #151a1b; box-shadow: 0 16px 35px rgba(0,0,0,.42); }
+.export-menu button { width: 100%; padding: 9px 10px; border: 0; border-radius: 7px; display: flex; align-items: flex-start; gap: 10px; color: #e5efeb; background: transparent; text-align: left; cursor: pointer; }
+.export-menu button:hover { background: #20302d; }
+.export-menu button > svg { flex: 0 0 auto; margin-top: 1px; color: var(--aqua); }
+.export-menu button span { display: grid; gap: 2px; }
+.export-menu button b { font-size: 12px; font-weight: 600; }
+.export-menu button small { color: #8d9a95; font-size: 10px; }
 .btn { height: 38px; padding: 0 14px; border: 1px solid var(--line); border-radius: 9px; display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12px; font-weight: 600; background: #14171b; }
 .btn:hover { border-color: #3b424b; }
 .btn.export { border-color: #53e6ca; color: #061410; background: var(--aqua); box-shadow: 0 0 20px rgba(41,226,194,.12); }

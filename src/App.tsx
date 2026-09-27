@@ -186,6 +186,8 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [processingProgress, setProcessingProgress] = useState(0)
   const processingWorker = useRef<Worker | null>(null)
   const [exporting, setExporting] = useState(false)
+  const [exportMenuOpen, setExportMenuOpen] = useState(false)
+  const exportMenuRef = useRef<HTMLDivElement>(null)
   const [exportMessage, setExportMessage] = useState('')
   const [transparent, setTransparent] = useState(0)
   const [previewBg, setPreviewBg] = useState('checker')
@@ -205,6 +207,13 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     else history.current=recordHistory(history.current,snapshot,gesture.current)
     setHistoryCounts({undo:history.current.past.length,redo:history.current.future.length})
   },[settings,widthCm,dpi,crop,dimensions,imageVersion,loading,activeGarment])
+  useEffect(() => {
+    const close = (event: PointerEvent) => {
+      if (!exportMenuRef.current?.contains(event.target as Node)) setExportMenuOpen(false)
+    }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [])
   const navigateHistory=(direction:'undo'|'redo')=>{
     if(!history.current || loading)return
     const next=moveHistory(history.current,direction)
@@ -571,7 +580,16 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           </div>
         </div>
         <div className="top-actions">
-          {fileName && tool === 'design' && <><button className="btn gang-send" title="Añadir el diseño procesado y abrir la plancha" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={sendToGang}><Layers3 size={16}/><span>{editingAssetId?'Actualizar en Gang Sheet':'Enviar a Gang Sheet'}</span></button><button className="btn" title="Descargar la imagen reescalada sin semitono" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={exportResizedPng}><ImageIcon size={16} /> Descargar reescalada</button><button className="btn export" title="Descargar la imagen semitoneada" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={exportPng}><Download size={17} /> {exporting ? 'Exportando…' : 'Exportar PNG'}</button></>}
+          {fileName && tool === 'design' && <>
+            <button className="btn gang-send" title="Añadir el diseño procesado y abrir la plancha" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={sendToGang}><Layers3 size={16}/><span>{editingAssetId?'Actualizar en Gang Sheet':'Enviar a Gang Sheet'}</span></button>
+            <div className="export-dropdown" ref={exportMenuRef}>
+              <button type="button" className="btn export export-trigger" aria-expanded={exportMenuOpen} aria-haspopup="menu" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={() => setExportMenuOpen(value => !value)}><Download size={17} /> <span>{exporting ? 'Exportando…' : 'Exportar'}</span><ChevronDown size={15} /></button>
+              {exportMenuOpen && <div className="export-menu" role="menu">
+                <button type="button" role="menuitem" onClick={() => { setExportMenuOpen(false); exportPng() }}><CircleDot size={16} /><span><b>Imagen semitoneada</b><small>PNG listo para producción</small></span></button>
+                <button type="button" role="menuitem" onClick={() => { setExportMenuOpen(false); exportResizedPng() }}><ImageIcon size={16} /><span><b>Imagen reescalada</b><small>PNG ampliado sin semitono</small></span></button>
+              </div>}
+            </div>
+          </>}
         </div>
       </header>
       <div className="project-toolbar" id="project-actions" role="group" aria-label="Acciones del proyecto" hidden={projectCollapsed}>
