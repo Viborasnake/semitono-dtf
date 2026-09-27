@@ -41,8 +41,8 @@ export default function GangPreview({width,height,dpi,background,placements,item
     ctx.fillStyle='#0d1013';ctx.fillRect(0,0,size.width,size.height)
     ctx.save()
     const originX=(areaW-sheetW)/2-scroll.x, originY=(areaH-sheetH)/2-scroll.y
-    ctx.translate(originX+(landscape?sheetW:0),originY)
-    if(landscape)ctx.rotate(Math.PI/2)
+    ctx.translate(originX,originY+(landscape?sheetH:0))
+    if(landscape)ctx.rotate(-Math.PI/2)
     ctx.beginPath();ctx.rect(0,0,pixelsW*scale,pixelsH*scale);ctx.clip()
     if(background==='checker') {
       const tile=document.createElement('canvas');tile.width=tile.height=16
@@ -68,7 +68,7 @@ export default function GangPreview({width,height,dpi,background,placements,item
   function pick(clientX:number,clientY:number){
     const rect=canvas.current!.getBoundingClientRect()
     const displayX=clientX-rect.left-(areaW-sheetW)/2+scroll.x, displayY=clientY-rect.top-(areaH-sheetH)/2+scroll.y
-    const x=landscape?displayY/scale:(displayX/scale), y=landscape?(sheetW-displayX)/scale:(displayY/scale)
+    const x=landscape?(sheetH-displayY)/scale:(displayX/scale), y=landscape?displayX/scale:(displayY/scale)
     return hitGangAsset(x,y,placements,items,dpi)
   }
   function changeZoom(next:number|null) {
