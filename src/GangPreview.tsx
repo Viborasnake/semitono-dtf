@@ -10,12 +10,20 @@ export default function GangPreview({width,height,dpi,background,placements,item
   const [size,setSize]=useState({width:1,height:1})
   const [zoom,setZoom]=useState<number|null>(null)
   const [scroll,setScroll]=useState({x:0,y:0})
+  const [landscape,setLandscape]=useState(false)
   const pixelsW=Math.max(1,Math.round(width/2.54*dpi)||1)
   const pixelsH=Math.max(1,Math.round(height/2.54*dpi)||1)
-  const fit=Math.max(.001,Math.min((size.width-48)/pixelsW,(size.height-48)/pixelsH))
+  const displayPixelsW=landscape?pixelsH:pixelsW, displayPixelsH=landscape?pixelsW:pixelsH
+  const fit=Math.max(.001,Math.min((size.width-48)/displayPixelsW,(size.height-48)/displayPixelsH))
   const scale=zoom??fit
-  const sheetW=pixelsW*scale,sheetH=pixelsH*scale
+  const sheetW=displayPixelsW*scale,sheetH=displayPixelsH*scale
   const areaW=Math.max(size.width,sheetW+48),areaH=Math.max(size.height,sheetH+48)
+  useEffect(()=>{
+    const query=window.matchMedia('(min-width: 801px)')
+    const update=()=>setLandscape(query.matches)
+    update();query.addEventListener('change',update)
+    return ()=>query.removeEventListener('change',update)
+  },[])
   useEffect(()=>{
     const el=viewport.current!
     const observer=new ResizeObserver(()=>setSize({width:el.clientWidth,height:el.clientHeight}))
@@ -29,15 +37,17 @@ export default function GangPreview({width,height,dpi,background,placements,item
     const ctx=el.getContext('2d',{colorSpace:'srgb'})!
     ctx.fillStyle='#0d1013';ctx.fillRect(0,0,size.width,size.height)
     ctx.save()
-    ctx.translate((areaW-sheetW)/2-scroll.x,(areaH-sheetH)/2-scroll.y)
-    ctx.beginPath();ctx.rect(0,0,sheetW,sheetH);ctx.clip()
+    const originX=(areaW-sheetW)/2-scroll.x, originY=(areaH-sheetH)/2-scroll.y
+    ctx.translate(originX+(landscape?sheetW:0),originY)
+    if(landscape)ctx.rotate(Math.PI/2)
+    ctx.beginPath();ctx.rect(0,0,pixelsW*scale,pixelsH*scale);ctx.clip()
     if(background==='checker') {
       const tile=document.createElement('canvas');tile.width=tile.height=16
       const t=tile.getContext('2d')!;t.fillStyle='#fff';t.fillRect(0,0,16,16)
       t.fillStyle='#d7d7d7';t.fillRect(0,0,8,8);t.fillRect(8,8,8,8)
       ctx.fillStyle=ctx.createPattern(tile,'repeat')!
     } else ctx.fillStyle=background
-    ctx.fillRect(0,0,sheetW,sheetH)
+    ctx.fillRect(0,0,pixelsW*scale,pixelsH*scale)
     ctx.imageSmoothingEnabled=false
     for(const p of placements) {
       const item=items.find(i=>i.id===p.id)
@@ -51,10 +61,12 @@ export default function GangPreview({width,height,dpi,background,placements,item
       ctx.restore()
     }
     ctx.restore()
-  },[size,scroll,scale,areaW,areaH,sheetW,sheetH,dpi,background,placements,items,selectedId])
+  },[size,scroll,scale,areaW,areaH,sheetW,sheetH,pixelsW,pixelsH,landscape,dpi,background,placements,items,selectedId])
   function pick(clientX:number,clientY:number){
     const rect=canvas.current!.getBoundingClientRect()
-    return hitGangAsset((clientX-rect.left-(areaW-sheetW)/2+scroll.x)/scale,(clientY-rect.top-(areaH-sheetH)/2+scroll.y)/scale,placements,items,dpi)
+    const displayX=clientX-rect.left-(areaW-sheetW)/2+scroll.x, displayY=clientY-rect.top-(areaH-sheetH)/2+scroll.y
+    const x=landscape?displayY/scale:(displayX/scale), y=landscape?(sheetW-displayX)/scale:(displayY/scale)
+    return hitGangAsset(x,y,placements,items,dpi)
   }
   function changeZoom(next:number|null) {
     setZoom(next===null?null:Math.max(.005,Math.min(4,next)))
