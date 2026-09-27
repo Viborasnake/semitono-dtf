@@ -6,11 +6,13 @@ import { pack } from './packing'
 import { inspectPng, withCanvasPrintProfile, resolutionCheck } from './print'
 import type {EditorDocument,GangSource} from './editor-document'
 import {updateGangAsset} from './editor-document'
+import {createHistory,recordHistory,moveHistory,type History} from './history'
 
 type Asset = {id:string;name:string;img:CanvasImageSource;naturalWidth:number;naturalHeight:number;widthCm:number;heightCm:number;quantity:number;document?:EditorDocument}
 export type ProjectActions={save:()=>void;open:()=>void}
 type Props = {source?:GangSource; onImportFile?:(file:File)=>void; onEditDocument?:(document:EditorDocument,name:string,id:string)=>void; previewColor?:string; onPreviewColorChange?:(value:string)=>void; getEditor?:()=>ProjectFile['editor']; restoreEditor?:(editor:ProjectFile['editor'])=>void; initialProject:ProjectFile;editorRevision:string;editorLoading:boolean;onSaveStatus:(s:ProjectSaveStatus)=>void;actionsRef?:Ref<ProjectActions>}
 type SavedAsset = {id:string;name:string;dataUrl:string;naturalWidth:number;naturalHeight:number;widthCm:number;heightCm:number;quantity:number;document?:EditorDocument}
+type GangSnapshot = {items:Asset[];projectName:string;width:number;height:number;dpi:number;gap:number;rotate:boolean;previewBg:string}
 const sheetStorageKey = 'trama-dtf-gang-sheet-v1'
 function savedSheetSettings() {
   try {
@@ -47,6 +49,9 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
   const projectInput=useRef<HTMLInputElement>(null)
   const [projectBusy,setProjectBusy]=useState(false)
   const [assetLoading,setAssetLoading]=useState(0)
+  const gangHistory=useRef<History<GangSnapshot>|null>(null)
+  const historyApplying=useRef(false)
+  const [historyCounts,setHistoryCounts]=useState({undo:0,redo:0})
   const serializedImages=useRef(new WeakMap<object,string>())
   function projectSnapshot():ProjectFile {
     const editor=getEditor?.()
@@ -60,6 +65,23 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
     return project
   }
   useProjectAutosave(projectSnapshot,[items,projectName,width,height,dpi,gap,rotate,previewBg,editorRevision],hydrated&&!projectBusy&&!editorLoading&&assetLoading===0,status=>{setSaveState(status.message);onSaveStatus({...status,name:status.name||projectName})})
+  useEffect(()=>{
+    if(!hydrated)return
+    if(historyApplying.current){historyApplying.current=false;return}
+    const snapshot:GangSnapshot={items:[...items],projectName,width,height,dpi,gap,rotate,previewBg}
+    if(!gangHistory.current)gangHistory.current=createHistory(snapshot)
+    else gangHistory.current=recordHistory(gangHistory.current,snapshot,0)
+    setHistoryCounts({undo:gangHistory.current.past.length,redo:gangHistory.current.future.length})
+  },[hydrated,items,projectName,width,height,dpi,gap,rotate,previewBg])
+  function navigateHistory(direction:'undo'|'redo'){
+    if(!gangHistory.current)return
+    const next=moveHistory(gangHistory.current,direction)
+    if(next===gangHistory.current)return
+    gangHistory.current=next;historyApplying.current=true
+    const s=next.present
+    setItems(s.items);setProjectName(s.projectName);setWidth(s.width);setHeight(s.height);setDpi(s.dpi);setGap(s.gap);setRotate(s.rotate);setPreviewBg(s.previewBg);onPreviewColorChange?.(s.previewBg)
+    setHistoryCounts({undo:next.past.length,redo:next.future.length})
+  }
   useImperativeHandle(actionsRef,()=>({save:()=>{void saveProject()},open:()=>projectInput.current?.click()}))
   async function saveProject() {
     setProjectBusy(true);setError('')
@@ -224,5 +246,5 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
     {tooBig && <p role="alert" className="error-text">Máximo 100 megapíxeles y 16.000 px por lado. Reduce la plancha o los ppp.</p>}
     {layout.missing>0 && <p role="alert" className="error-text">{layout.missing} copias no caben. Amplía la plancha o reduce copias/tamaños para exportar todo.</p>}
     {error && <p className="error-text" role="alert">{error}</p>}
-  </aside><div className="gang-stage"><div className="gang-toolbar"><div className="gang-toolbar-left"><span>Vista sobre</span><select aria-label="Seleccionar diseño" value={selectedAsset?.id??''} onChange={e=>setSelectedId(e.target.value||null)}><option value="">Seleccionar diseño…</option>{items.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select><button className="btn" disabled={!selectedAsset} onClick={()=>selectedAsset&&editAsset(selectedAsset.id)}>Editar seleccionado</button><select aria-label="Fondo de vista previa del Gang Sheet" value={previewBg} onChange={e=>{setPreviewBg(e.target.value);onPreviewColorChange?.(e.target.value)}}><option value="checker">Transparencia</option><option value="black">Prenda negra</option><option value="white">Prenda blanca</option><option value="#596778">Prenda gris</option><option value="#304b70">Prenda azul marino</option><option value="#7b2931">Prenda roja</option></select><span>{layout.placements.length} diseños · {layout.usedHeight.toFixed(1)} cm de alto ocupado</span></div><button className="btn export" disabled={invalid||busy} onClick={exportSheet}>{busy?'Exportando…':'Exportar Gang Sheet'}</button></div><GangPreview width={width} height={height} dpi={dpi} background={previewBg} placements={layoutError?[]:layout.placements} items={items} selectedId={selectedAsset?.id} onSelect={setSelectedId} onEdit={editAsset}/><div className="gang-status" role="status">{message || 'Plancha transparente · El fondo de vista previa no se exporta'}</div></div></section>
+  </aside><div className="gang-stage"><div className="gang-toolbar"><div className="gang-toolbar-left"><div className="history-controls gang-history" role="group" aria-label="Historial del Gang Sheet"><button className="btn" disabled={!historyCounts.undo||projectBusy||busy} onClick={()=>navigateHistory('undo')} title="Deshacer (⌘/Ctrl Z)">↶ Deshacer</button><button className="btn" disabled={!historyCounts.redo||projectBusy||busy} onClick={()=>navigateHistory('redo')} title="Rehacer (⌘/Ctrl Shift Z)">↷ Rehacer</button></div><span>Vista sobre</span><select aria-label="Seleccionar diseño" value={selectedAsset?.id??''} onChange={e=>setSelectedId(e.target.value||null)}><option value="">Seleccionar diseño…</option>{items.map(a=><option key={a.id} value={a.id}>{a.name}</option>)}</select><button className="btn" disabled={!selectedAsset} onClick={()=>selectedAsset&&editAsset(selectedAsset.id)}>Editar seleccionado</button><select aria-label="Fondo de vista previa del Gang Sheet" value={previewBg} onChange={e=>{setPreviewBg(e.target.value);onPreviewColorChange?.(e.target.value)}}><option value="checker">Transparencia</option><option value="black">Prenda negra</option><option value="white">Prenda blanca</option><option value="#596778">Prenda gris</option><option value="#304b70">Prenda azul marino</option><option value="#7b2931">Prenda roja</option></select><span>{layout.placements.length} diseños · {layout.usedHeight.toFixed(1)} cm de alto ocupado</span></div><button className="btn export" disabled={invalid||busy} onClick={exportSheet}>{busy?'Exportando…':'Exportar Gang Sheet'}</button></div><GangPreview width={width} height={height} dpi={dpi} background={previewBg} placements={layoutError?[]:layout.placements} items={items} selectedId={selectedAsset?.id} onSelect={setSelectedId} onEdit={editAsset}/><div className="gang-status" role="status">{message || 'Plancha transparente · El fondo de vista previa no se exporta'}</div></div></section>
 }
