@@ -1,5 +1,3 @@
-import * as ort from 'onnxruntime-web'
-
 const MODEL_URL = '/models/real_esrgan_x2.onnx'
 const TILE = 512
 const PAD = 16
@@ -7,9 +5,11 @@ const PAD = 16
 // Experimental CPU/WASM path. Tiles keep peak memory bounded and the padded
 // overlap prevents visible seams when the model sees a tile boundary.
 export async function neuralUpscaleRgba(data: Uint8ClampedArray, width: number, height: number) {
-  ort.env.wasm.numThreads = 1
+  const useWebGpu = typeof navigator !== 'undefined' && 'gpu' in navigator
+  const ort = await (useWebGpu ? import('onnxruntime-web/webgpu') : import('onnxruntime-web'))
+  if (!useWebGpu) ort.env.wasm.numThreads = 1
   const session = await ort.InferenceSession.create(MODEL_URL, {
-    executionProviders: ['wasm'],
+    executionProviders: useWebGpu ? ['webgpu'] : ['wasm'],
     graphOptimizationLevel: 'all',
   })
   const outputWidth = width * 2, outputHeight = height * 2
@@ -30,7 +30,7 @@ export async function neuralUpscaleRgba(data: Uint8ClampedArray, width: number, 
       input[2 * paddedWidth * paddedHeight + target] = data[source + 2] / 255 * alpha
     }
     const result = await session.run({[inputName]: new ort.Tensor('float32', input, [1, 3, paddedHeight, paddedWidth])})
-    const tensor = result[outputName] as ort.Tensor
+    const tensor = result[outputName] as {data: Float32Array}
     const values = tensor.data as Float32Array
     const modelWidth = paddedWidth * 2, modelHeight = paddedHeight * 2
     const plane = modelWidth * modelHeight
