@@ -740,8 +740,8 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             </div>
             <div className="preview-background"><span>Vista sobre</span><select aria-label="Fondo de vista previa" value={previewBg} onChange={(e) => setPreviewBg(e.target.value)}><option value="checker">Transparencia</option><option value="black">Prenda negra</option><option value="white">Prenda blanca</option><option value="#596778">Prenda gris</option><option value="#304b70">Prenda azul marino</option><option value="#7b2931">Prenda roja</option></select></div>
             <div className="stage-image-actions">
-              <button className="btn gang-send" title="Añadir el diseño procesado y abrir la plancha" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={sendToGang}><Layers3 size={16}/><span>{editingAssetId?'Actualizar en Gang Sheet':'Enviar a Gang Sheet'}</span></button>
               <button className="upload-mini" onClick={() => fileInput.current?.click()}><Upload size={15} /> Cambiar imagen</button>
+              <button className="btn gang-send" title="Añadir el diseño procesado y abrir la plancha" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={sendToGang}><Layers3 size={16}/><span>{editingAssetId?'Actualizar en Gang Sheet':'Enviar a Gang Sheet'}</span></button>
             </div>
             <input ref={fileInput} hidden type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(e) => { requestImport(e.target.files?.[0]); e.target.value='' }} />
           </div>
