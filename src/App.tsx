@@ -340,6 +340,9 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const visibleSize=displaySize ?? dimensions
   const previewScale = fit ? Math.min((viewport.width - 48) / visibleSize.width, (viewport.height - 48) / visibleSize.height, 1) : zoom / 100
   const shownZoom = Math.max(1, Math.round(previewScale * 100))
+  // CSS assumes 96 px per inch. This maps output pixels to their physical
+  // printed size at the selected output DPI (e.g. 300 ppp => 32% zoom).
+  const realSizeZoom = 96 / dpi * 100
   const changeZoom = (factor: number) => { setZoom(Math.max(5, Math.min(400, Math.round(shownZoom * factor)))); setFit(false) }
 
   const loadImage = (src: string, name: string, sourceDpi=300, physicalWidth?:number, document?:EditorDocument,assetId?:string) => {
@@ -771,7 +774,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
 
           <div className="statusbar" hidden={!fileName}>
             <div><span className="status-dot" /> Vista previa en tiempo real</div>
-            <div className="zoom-control"><button className={`hand-button ${handActive ? 'active' : ''}`} aria-label="Mano para mover imagen" aria-pressed={handTool} title="Mano: arrastra para mover. También puedes mantener Espacio o usar el botón central del ratón." onClick={() => setHandTool(v => !v)}><Hand size={16} /></button><ZoomIn size={15} /><button aria-label="Reducir zoom" onClick={() => changeZoom(.8)}><Minus size={14} /></button><span>{shownZoom}%</span><button aria-label="Aumentar zoom" onClick={() => changeZoom(1.25)}><Plus size={14} /></button><button className="zoom-text" onClick={() => setFit(true)}>Ajustar</button><button className="zoom-text" aria-label="Tamaño real: 100%" title="Tamaño real (100%)" onClick={() => {setFit(false);setZoom(100)}}>Tamaño real</button></div>
+            <div className="zoom-control"><button className={`hand-button ${handActive ? 'active' : ''}`} aria-label="Mano para mover imagen" aria-pressed={handTool} title="Mano: arrastra para mover. También puedes mantener Espacio o usar el botón central del ratón." onClick={() => setHandTool(v => !v)}><Hand size={16} /></button><ZoomIn size={15} /><button aria-label="Reducir zoom" onClick={() => changeZoom(.8)}><Minus size={14} /></button><span>{shownZoom}%</span><button aria-label="Aumentar zoom" onClick={() => changeZoom(1.25)}><Plus size={14} /></button><button className="zoom-text" onClick={() => setFit(true)}>Ajustar</button><button className="zoom-text" aria-label={`Tamaño real: ${Math.round(realSizeZoom)}%`} title={`Tamaño real aproximado a ${dpi} ppp`} onClick={() => {setFit(false);setZoom(realSizeZoom)}}>Tamaño real</button></div>
             <div>PNG · Fondo transparente</div>
           </div>
         </section>

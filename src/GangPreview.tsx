@@ -18,6 +18,8 @@ export default function GangPreview({width,height,dpi,background,placements,item
   const pixelsH=Math.max(1,Math.round(height/2.54*dpi)||1)
   const displayPixelsW=landscape?pixelsH:pixelsW, displayPixelsH=landscape?pixelsW:pixelsH
   const fit=Math.max(.001,Math.min((size.width-48)/displayPixelsW,(size.height-48)/displayPixelsH))
+  // CSS assumes 96 px per inch; use the sheet DPI to represent physical size.
+  const realSizeScale=96/dpi
   const scale=zoom??fit
   const sheetW=displayPixelsW*scale,sheetH=displayPixelsH*scale
   const areaW=Math.max(size.width,sheetW+48),areaH=Math.max(size.height,sheetH+48)
@@ -104,7 +106,7 @@ export default function GangPreview({width,height,dpi,background,placements,item
         <span>{(scale*100).toFixed(1)}%</span>
         <button aria-label="Acercar Gang Sheet" onClick={()=>changeZoom(scale*1.25)}><Plus size={14}/></button>
         <button className="zoom-text" aria-pressed={zoom===null} onClick={()=>changeZoom(null)}>Ajustar</button>
-        <button className="zoom-text" aria-pressed={zoom===1} aria-label="Tamaño real: 100%" title="Tamaño real (100%)" onClick={()=>changeZoom(1)}>Tamaño real</button>
+        <button className="zoom-text" aria-pressed={zoom===realSizeScale} aria-label={`Tamaño real: ${Math.round(realSizeScale*100)}%`} title={`Tamaño real aproximado a ${dpi} ppp`} onClick={()=>changeZoom(realSizeScale)}>Tamaño real</button>
       </div>
       <div className="gang-format">{status || `PNG · ${background==='checker'?'Fondo transparente':`Vista sobre ${background}`}`}</div>
     </div>
