@@ -57,18 +57,6 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
     const edgeAlpha = t * t * (3 - 2 * t)
     if (!edgeAlpha) { transparent++; continue }
     let r = data[i] / 255, g = data[i + 1] / 255, b = data[i + 2] / 255
-    const left = (y * width + Math.max(0, x - 1)) * 4
-    const right = (y * width + Math.min(width - 1, x + 1)) * 4
-    const top = (Math.max(0, y - 1) * width + x) * 4
-    const bottom = (Math.min(height - 1, y + 1) * width + x) * 4
-    if (s.sharpness) {
-      const sharpen = (value: number, channel: number) => {
-        let sum = 0, weights = 0
-        for (const j of [left, right, top, bottom]) { const alpha = data[j + 3] / 255; sum += data[j + channel] / 255 * alpha; weights += alpha }
-        return clamp(value + (value - (weights ? sum / weights : value)) * s.sharpness! / 100 * 6)
-      }
-      r = sharpen(r, 0); g = sharpen(g, 1); b = sharpen(b, 2)
-    }
     const max = Math.max(r, g, b), min = Math.min(r, g, b)
     let coverage: number
     if (processingBackground === 'black') {

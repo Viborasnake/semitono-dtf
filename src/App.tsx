@@ -6,6 +6,7 @@ import {readActiveProject,writeActiveProject,deleteActiveProject,emptyProject} f
 import type {ProjectSaveStatus} from './use-project-autosave'
 import {renamePersonalPreset,deletePersonalPreset} from './preset-library'
 import {clearActiveProject} from './reset-project'
+import type {ResizeMethod} from './resample'
 import type {EditorDocument,GangSource} from './editor-document'
 import {migratePresetSettings} from './preset-migration'
 import {garmentPresets as presets,presetsFor,type GarmentTone,type PresetMode} from './garment-presets'
@@ -52,6 +53,7 @@ export type Settings = {
   temperature: number
   tint: number
   autoColorStrength: number
+  resampleMethod: ResizeMethod
 }
 
 const defaults: Settings = {
@@ -85,6 +87,7 @@ const defaults: Settings = {
   temperature: 0,
   tint: 0,
   autoColorStrength: 100,
+  resampleMethod: 'lanczos3',
 }
 
 const initialSettings:Settings = {...defaults,...presets.default.values}
@@ -311,6 +314,13 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   let output: ReturnType<typeof printSize> | undefined
   let sizeError = ''
   try { if(fileName) output = printSize(Number(widthCm), ratio, dpi) } catch (e) { sizeError = (e as Error).message }
+  const resizeInfo = output ? {
+    sourceWidth: dimensions.width,
+    sourceHeight: dimensions.height,
+    outputWidth: output.width,
+    outputHeight: output.height,
+    percent: output.width / dimensions.width * 100,
+  } : null
   const renderKey = JSON.stringify([imageVersion, output?.width, output?.height, dpi, settings,crop])
   const processing = loading || (!!output && readyKey !== renderKey && !error)
   const visibleSize=displaySize ?? dimensions
@@ -564,16 +574,25 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <button className="btn" disabled={loading||!fileName||!output} onClick={trimToContent}>Recortar al contenido</button>
             <p className="help-text">Quita márgenes transparentes del original, sin ampliar el diseño. Conserva los huecos internos. Puedes deshacer el recorte.</p>{cropMessage&&<p className="help-text" role="status">{cropMessage}</p>}
             <details className="advanced-controls"><summary>Escala por porcentaje</summary><div className="advanced-body">
-            <label className="field">Escala del original (%)<input aria-label="Escala del original en porcentaje" type="number" min="1" max="2000" step="25" value={widthCm && Number(widthCm) > 0 ? Number((Number(widthCm) / 2.54 * dpi / dimensions.width * 100).toFixed(1)) : ''} onChange={e => setWidthCm(e.target.value ? (dimensions.width * Number(e.target.value) / 100 / dpi * 2.54).toFixed(4) : '')} /></label>
+            <label className="field">Reescalado de imagen (%)<input aria-label="Reescalado de imagen en porcentaje" type="number" min="1" max="2000" step="25" value={widthCm && Number(widthCm) > 0 ? Number((Number(widthCm) / 2.54 * dpi / dimensions.width * 100).toFixed(1)) : ''} onChange={e => setWidthCm(e.target.value ? (dimensions.width * Number(e.target.value) / 100 / dpi * 2.54).toFixed(4) : '')} /></label>
             <div className="scale-presets">{[100,200,300,400].map(percent => <button key={percent} onClick={() => setWidthCm((dimensions.width * percent / 100 / dpi * 2.54).toFixed(4))}>{percent}%</button>)}</div>
             </div></details>
             <div className="dimension-fields"><label>Ancho (cm)<input aria-label="Ancho en centímetros" type="number" min="0.1" step="0.1" value={widthCm} onChange={e => setWidthCm(e.target.value)} /></label><label>Alto (cm)<input aria-label="Alto en centímetros" type="number" min="0.1" step="0.1" value={widthCm && Number(widthCm) > 0 ? (Number(widthCm) / ratio).toFixed(2) : ''} onChange={e => setWidthCm(e.target.value ? String(Number(e.target.value) * ratio) : '')} /></label></div>
             <label className="field">Resolución<select aria-label="Resolución de impresión" value={dpi} onChange={e => setDpi(Number(e.target.value))}><option value="150">150 ppp</option><option value="300">300 ppp</option><option value="600">600 ppp</option></select></label>
             <p className="help-text">Salida PNG sRGB, 8 bits por canal. Comprueba los ppp requeridos por tu RIP. Aumentarlos no recupera detalle del original.</p>
-            <p className="help-text">Proporciones bloqueadas. {output ? `${output.width} × ${output.height} px de salida.` : ''}</p>
-            <p className="help-text">Ampliación Lanczos · La trama se genera después de escalar.</p>
-            <RangeControl label="Nitidez adicional" value={settings.sharpness} min={0} max={100} unit="%" onChange={v => update('sharpness', v)} />
-            {output && output.width > dimensions.width * 1.05 && <p className="help-text">Ampliación de {(output.width / dimensions.width).toFixed(1)}×. El tamaño aumenta, pero no recupera detalle del original.</p>}
+            <p className="help-text">Proporciones bloqueadas.</p>
+            <label className="field">Método de reescalado<select aria-label="Método de reescalado" value={settings.resampleMethod} onChange={e => update('resampleMethod', e.target.value as ResizeMethod)}><option value="lanczos3">Lanczos-3 · fotos y detalle</option><option value="bicubic">Bicúbico · fotos suaves</option><option value="bilinear">Bilineal · rapidez</option><option value="nearest">Vecino más cercano · pixel art</option></select></label>
+            <p className="help-text">{({lanczos3:'Recomendado para fotografías y ampliaciones con mucho detalle. Es el método más definido, pero puede marcar más los bordes.',bicubic:'Recomendado para fotografías cuando buscas un resultado más suave y con menos riesgo de halos.',bilinear:'Recomendado para previsualizaciones rápidas o ampliaciones moderadas. Suaviza más y conserva menos detalle fino.',nearest:'Recomendado para pixel art, gráficos con píxeles intencionales o formas muy duras. No usar para fotografías.'} as Record<ResizeMethod,string>)[settings.resampleMethod]}</p>
+            {resizeInfo && <div className="resize-summary" role="status">
+              <strong>Reescalado activo</strong>
+              <span>Original: {resizeInfo.sourceWidth.toLocaleString()} × {resizeInfo.sourceHeight.toLocaleString()} px</span>
+              <span>Salida: {resizeInfo.outputWidth.toLocaleString()} × {resizeInfo.outputHeight.toLocaleString()} px · {resizeInfo.percent.toFixed(1)}%</span>
+              <span>Método: {({lanczos3:'Lanczos-3',bicubic:'Bicúbico',bilinear:'Bilineal',nearest:'Vecino más cercano'} as Record<ResizeMethod,string>)[settings.resampleMethod]} · Se aplica antes del semitono</span>
+            </div>}
+            <p className="help-text">La ampliación aumenta los píxeles de salida, pero no recupera detalle que no exista en el original.</p>
+            <RangeControl label="Nitidez post-reescalado" value={settings.sharpness} min={0} max={100} unit="%" onChange={v => update('sharpness', v)} />
+            <div className="field"><span>Presets de nitidez</span><div className="scale-presets sharpness-presets" role="group" aria-label="Presets de nitidez">{[0,25,50].map(value => <button key={value} type="button" aria-pressed={settings.sharpness===value} onClick={() => update('sharpness', value)}>{value}%</button>)}</div></div>
+            <p className="help-text">Se aplica después de ampliar y antes del semitono. Usa valores bajos para fotografías y valores altos solo para gráficos definidos; el alfa se protege para reducir halos.</p>
             {sizeError && <p className="error-text" role="alert">{sizeError}</p>}
           </div></section>
 
