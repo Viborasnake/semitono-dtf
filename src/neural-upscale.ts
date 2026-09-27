@@ -1,18 +1,18 @@
-const MODEL_URL = '/models/real_esrgan_x2.onnx'
 const TILE = 512
 const PAD = 16
 
 // Experimental CPU/WASM path. Tiles keep peak memory bounded and the padded
 // overlap prevents visible seams when the model sees a tile boundary.
-export async function neuralUpscaleRgba(data: Uint8ClampedArray, width: number, height: number) {
+export async function neuralUpscaleRgba(data: Uint8ClampedArray, width: number, height: number, scale: 2 | 4) {
+  const modelUrl = `/models/real_esrgan_x${scale}.onnx`
   const useWebGpu = typeof navigator !== 'undefined' && 'gpu' in navigator
   const ort = await (useWebGpu ? import('onnxruntime-web/webgpu') : import('onnxruntime-web'))
   if (!useWebGpu) ort.env.wasm.numThreads = 1
-  const session = await ort.InferenceSession.create(MODEL_URL, {
+  const session = await ort.InferenceSession.create(modelUrl, {
     executionProviders: useWebGpu ? ['webgpu'] : ['wasm'],
     graphOptimizationLevel: 'all',
   })
-  const outputWidth = width * 2, outputHeight = height * 2
+  const outputWidth = width * scale, outputHeight = height * scale
   const output = new Uint8ClampedArray(outputWidth * outputHeight * 4)
   const inputName = session.inputNames[0], outputName = session.outputNames[0]
   for (let y = 0; y < height; y += TILE) for (let x = 0; x < width; x += TILE) {
@@ -32,12 +32,12 @@ export async function neuralUpscaleRgba(data: Uint8ClampedArray, width: number, 
     const result = await session.run({[inputName]: new ort.Tensor('float32', input, [1, 3, paddedHeight, paddedWidth])})
     const tensor = result[outputName] as {data: Float32Array}
     const values = tensor.data as Float32Array
-    const modelWidth = paddedWidth * 2, modelHeight = paddedHeight * 2
+    const modelWidth = paddedWidth * scale, modelHeight = paddedHeight * scale
     const plane = modelWidth * modelHeight
     for (let py = 0; py < coreHeight; py++) for (let px = 0; px < coreWidth; px++) {
-      const ox = (x + px) * 2, oy = (y + py) * 2
-      const modelX = (px + PAD) * 2, modelY = (py + PAD) * 2
-      for (let dy = 0; dy < 2; dy++) for (let dx = 0; dx < 2; dx++) {
+      const ox = (x + px) * scale, oy = (y + py) * scale
+      const modelX = (px + PAD) * scale, modelY = (py + PAD) * scale
+      for (let dy = 0; dy < scale; dy++) for (let dx = 0; dx < scale; dx++) {
         const source = (modelY + dy) * modelWidth + modelX + dx
         const target = ((oy + dy) * outputWidth + ox + dx) * 4
         output[target] = Math.max(0, Math.min(255, Math.round(values[source] * 255)))
