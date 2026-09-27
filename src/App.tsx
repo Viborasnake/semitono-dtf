@@ -186,6 +186,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [loading, setLoading] = useState(false)
   const [processingProgress, setProcessingProgress] = useState(0)
   const processingWorker = useRef<Worker | null>(null)
+  const resizedCache = useRef<{key:string;data:Uint8ClampedArray;width:number;height:number}|null>(null)
   const [exporting, setExporting] = useState(false)
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const exportMenuRef = useRef<HTMLDivElement>(null)
@@ -334,6 +335,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     percent: output.width / dimensions.width * 100,
   } : null
   const renderKey = JSON.stringify([imageVersion, output?.width, output?.height, dpi, settings,crop])
+  const resizeKey = JSON.stringify([imageVersion, output?.width, output?.height, dpi, settings.resampleMethod, settings.sharpness, crop])
   const processing = loading || (!!output && readyKey !== renderKey && !error)
   const visibleSize=displaySize ?? dimensions
   const previewScale = fit ? Math.min((viewport.width - 48) / visibleSize.width, (viewport.height - 48) / visibleSize.height, 1) : zoom / 100
@@ -396,6 +398,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             // Resize only when the replacement is ready: resizing clears canvas pixels.
             const originalPixels=new ImageData(data.original,width,height)
             const resultPixels=new ImageData(data.data,width,height)
+            resizedCache.current={key:resizeKey,data:new Uint8ClampedArray(data.original),width,height}
             src.width = out.width = width
             src.height = out.height = height
             src.getContext('2d')!.putImageData(originalPixels, 0, 0)
@@ -409,12 +412,14 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           if (processingWorker.current === worker) processingWorker.current = null
         }
         worker.onerror = () => { if (!cancelled) setError('No se pudo procesar. Reduce el tamaño e inténtalo nuevamente.'); worker?.terminate(); if (processingWorker.current === worker) processingWorker.current = null }
-        worker.postMessage({ data: input.data, width, height, sourceWidth: input.width, sourceHeight: input.height, settings: { ...settings, dpi } }, [input.data.buffer])
+        const cached=resizedCache.current?.key===resizeKey ? new Uint8ClampedArray(resizedCache.current.data) : null
+        const workerData=cached??input.data
+        worker.postMessage({ data: workerData, preprocessed: !!cached, width, height, sourceWidth: input.width, sourceHeight: input.height, settings: { ...settings, dpi } }, [workerData.buffer])
         native.width = native.height = 1
       } catch (e) { if (!cancelled) setError((e as Error).message) }
     }, 120)
     return () => { cancelled = true; clearTimeout(timer); worker?.terminate(); if (processingWorker.current === worker) processingWorker.current = null }
-  }, [renderKey, loading])
+  }, [renderKey, loading, resizeKey])
 
   const stopProcessing = () => {
     loadId.current++
