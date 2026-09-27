@@ -1,4 +1,4 @@
-export type ResizeMethod = 'lanczos3' | 'bicubic' | 'bilinear' | 'nearest'
+export type ResizeMethod = 'lanczos3' | 'bicubic' | 'bilinear' | 'nearest' | 'neural2'
 
 // Alpha-aware unsharp mask. Colors from transparent neighbors are ignored so
 // sharpening a cutout cannot pull a black/white matte into its visible edge.
