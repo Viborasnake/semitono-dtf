@@ -216,3 +216,9 @@ test('radius clamps on small artwork and empty artwork remains empty',()=>{
  const result=halftone(image(255,255,255),64,64,{...settings,enabled:false,cornerRadiusMm:50})
  assert.equal(result.data[3],0);assert.equal(result.data[(32*64+32)*4+3],255)
 })
+test('corner radius uses inward feathering for a softened halftone edge',()=>{
+ const result=halftone(image(255,255,255),64,64,{...settings,enabled:false,background:'none',dpi:254,cornerRadiusMm:8,featherMm:2})
+ const alpha=(x:number,y:number)=>result.data[(y*64+x)*4+3]
+ assert.ok(alpha(10,10)>0&&alpha(10,10)<255)
+ assert.equal(alpha(0,0),0)
+})

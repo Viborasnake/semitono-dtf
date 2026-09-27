@@ -141,7 +141,21 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
         const cx=Math.max(ox+rx,Math.min(ex+1-rx,x+.5))
         const cy=Math.max(oy+ry,Math.min(ey+1-ry,y+.5))
         const i=(y*width+x)*4
-        if (output[i+3] && ((x+.5-cx)/rx)**2+((y+.5-cy)/ry)**2>1) { output[i]=output[i+1]=output[i+2]=output[i+3]=0; transparent++ }
+        if (!output[i+3]) continue
+        const dx=Math.abs(x+.5-(ox+ex+1)/2)-(ex-ox+1)/2+rx
+        const dy=Math.abs(y+.5-(oy+ey+1)/2)-(ey-oy+1)/2+ry
+        const outside=Math.hypot(Math.max(dx,0),Math.max(dy,0))
+        const inside=Math.min(Math.max(dx,dy),0)
+        // The rounded-rectangle SDF is measured from the quarter-circle
+        // boundary, so subtract the corner radius after the box distance.
+        const signedDistance=outside+inside-rx
+        const rounded=((x+.5-cx)/rx)**2+((y+.5-cy)/ry)**2<=1
+        const mask=feather>0?clamp(-signedDistance/feather):rounded?1:0
+        if (!mask) { output[i]=output[i+1]=output[i+2]=output[i+3]=0; transparent++ }
+        else if (mask<1) {
+          output[i+3]=Math.round(output[i+3]*mask)
+          if (!output[i+3]) transparent++
+        }
       }
     }
   }
