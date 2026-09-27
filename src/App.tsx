@@ -583,7 +583,6 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
         </div>
         <div className="top-actions">
           {fileName && tool === 'design' && <>
-            <button className="btn gang-send" title="Añadir el diseño procesado y abrir la plancha" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={sendToGang}><Layers3 size={16}/><span>{editingAssetId?'Actualizar en Gang Sheet':'Enviar a Gang Sheet'}</span></button>
             <div className="export-dropdown" ref={exportMenuRef}>
               <button type="button" className="btn export export-trigger" aria-expanded={exportMenuOpen} aria-haspopup="menu" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={() => setExportMenuOpen(value => !value)}><Download size={17} /> <span>{exporting ? 'Exportando…' : 'Exportar'}</span><ChevronDown size={15} /></button>
               {exportMenuOpen && <div className="export-menu" role="menu">
@@ -740,7 +739,10 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               <button className={view === 'result' ? 'active' : ''} onClick={() => setView('result')}><CircleDot size={15} /> Resultado</button>
             </div>
             <div className="preview-background"><span>Vista sobre</span><select aria-label="Fondo de vista previa" value={previewBg} onChange={(e) => setPreviewBg(e.target.value)}><option value="checker">Transparencia</option><option value="black">Prenda negra</option><option value="white">Prenda blanca</option><option value="#596778">Prenda gris</option><option value="#304b70">Prenda azul marino</option><option value="#7b2931">Prenda roja</option></select></div>
-            <button className="upload-mini" onClick={() => fileInput.current?.click()}><Upload size={15} /> Cambiar imagen</button>
+            <div className="stage-image-actions">
+              <button className="btn gang-send" title="Añadir el diseño procesado y abrir la plancha" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={sendToGang}><Layers3 size={16}/><span>{editingAssetId?'Actualizar en Gang Sheet':'Enviar a Gang Sheet'}</span></button>
+              <button className="upload-mini" onClick={() => fileInput.current?.click()}><Upload size={15} /> Cambiar imagen</button>
+            </div>
             <input ref={fileInput} hidden type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(e) => { requestImport(e.target.files?.[0]); e.target.value='' }} />
           </div>
           {processing && <div className="processing stage-processing" role="status" aria-live="polite">
