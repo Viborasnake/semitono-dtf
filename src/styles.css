@@ -353,7 +353,7 @@ input[type=checkbox] { accent-color:var(--aqua); }
 
 /* Shared editor toolbar controls. */
 .app-shell { display:flex; flex-direction:column; height:100dvh; min-height:0; overflow:hidden; }
-.app-shell > .topbar { flex:none; grid-template-columns:auto minmax(0,1fr) auto; min-height:72px; height:auto; padding:12px 20px; gap:24px; }
+.app-shell > .topbar { position:relative; z-index:30; flex:none; grid-template-columns:auto minmax(0,1fr) auto; min-height:72px; height:auto; padding:12px 20px; gap:24px; }
 .app-shell > .tool-tabs { flex:none; }
 .app-shell > .workspace, .app-shell > .gang-container { flex:1; min-height:0; height:auto; }
 .gang-container > .workspace { height:100%; }
