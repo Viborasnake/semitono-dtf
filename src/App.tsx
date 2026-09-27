@@ -183,6 +183,8 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [imageVersion, setImageVersion] = useState(0)
   const [readyKey, setReadyKey] = useState('')
   const [loading, setLoading] = useState(false)
+  const [processingProgress, setProcessingProgress] = useState(0)
+  const processingWorker = useRef<Worker | null>(null)
   const [exporting, setExporting] = useState(false)
   const [exportMessage, setExportMessage] = useState('')
   const [transparent, setTransparent] = useState(0)
@@ -363,6 +365,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     const { width, height } = output
     setError('')
     setExportMessage('')
+    setProcessingProgress(0)
     const timer = setTimeout(() => {
       try {
         const src = sourceCanvas.current!, out = resultCanvas.current!
@@ -373,8 +376,10 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
         ctx.drawImage(imageRef.current!, 0, 0)
         const input = ctx.getImageData(crop?.x ?? 0, crop?.y ?? 0, crop?.width ?? native.width, crop?.height ?? native.height)
         worker = new Worker(new URL('./halftone.worker.ts', import.meta.url), { type: 'module' })
+        processingWorker.current = worker
         worker.onmessage = ({ data }) => {
           if (cancelled) return
+          if (data.type === 'progress') { setProcessingProgress(data.progress); return }
           if (data.error) setError(data.error)
           else {
             // Resize only when the replacement is ready: resizing clears canvas pixels.
@@ -387,16 +392,27 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             setDisplaySize({width,height})
             setTransparent(data.transparent)
             setReadyKey(renderKey)
+            setProcessingProgress(100)
           }
           worker?.terminate()
+          if (processingWorker.current === worker) processingWorker.current = null
         }
-        worker.onerror = () => { if (!cancelled) setError('No se pudo procesar. Reduce el tamaño e inténtalo nuevamente.'); worker?.terminate() }
+        worker.onerror = () => { if (!cancelled) setError('No se pudo procesar. Reduce el tamaño e inténtalo nuevamente.'); worker?.terminate(); if (processingWorker.current === worker) processingWorker.current = null }
         worker.postMessage({ data: input.data, width, height, sourceWidth: input.width, sourceHeight: input.height, settings: { ...settings, dpi } }, [input.data.buffer])
         native.width = native.height = 1
       } catch (e) { if (!cancelled) setError((e as Error).message) }
     }, 120)
-    return () => { cancelled = true; clearTimeout(timer); worker?.terminate() }
+    return () => { cancelled = true; clearTimeout(timer); worker?.terminate(); if (processingWorker.current === worker) processingWorker.current = null }
   }, [renderKey, loading])
+
+  const stopProcessing = () => {
+    loadId.current++
+    processingWorker.current?.terminate()
+    processingWorker.current = null
+    setLoading(false)
+    setProcessingProgress(0)
+    setError('Procesamiento detenido.')
+  }
 
   const handleFile = async (file?: File, print?:{widthCm:number;dpi:number}) => {
     if (!file) return
@@ -700,7 +716,14 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <button className="upload-mini" onClick={() => fileInput.current?.click()}><Upload size={15} /> Cambiar imagen</button>
             <input ref={fileInput} hidden type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(e) => { requestImport(e.target.files?.[0]); e.target.value='' }} />
           </div>
-          {processing && <div className="processing stage-processing"><span /> Procesando trama…</div>}
+          {processing && <div className="processing stage-processing" role="status" aria-live="polite">
+            <span className="processing-spinner" />
+            <div className="processing-content">
+              <div className="processing-label">Procesando trama… <b>{processingProgress}%</b></div>
+              <div className="processing-progress" role="progressbar" aria-label="Progreso del procesamiento" aria-valuemin={0} aria-valuemax={100} aria-valuenow={processingProgress}><i style={{ width: `${processingProgress}%` }} /></div>
+            </div>
+            <button type="button" className="processing-stop" onClick={stopProcessing}>Detener</button>
+          </div>}
 
           <div className={`canvas-area ${handActive ? 'hand-active' : ''} ${panning ? 'is-panning' : ''}`} ref={viewportRef} onPointerDownCapture={startPan} onPointerMove={movePan} onPointerUp={stopPan} onPointerCancel={stopPan} onLostPointerCapture={stopPan}>
             {!fileName && <div className="start-upload"><Upload size={36}/><h2>Arrastra tu imagen aquí</h2><p>PNG, JPG, WebP o SVG</p><button className="btn export" disabled={loading} onClick={()=>fileInput.current?.click()}>{loading?'Abriendo imagen…':'Abrir imagen'}</button>{error && <p className="error-text" role="alert">{error}</p>}</div>}
