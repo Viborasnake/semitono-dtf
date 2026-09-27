@@ -7,13 +7,22 @@ import { inspectPng, withCanvasPrintProfile, resolutionCheck } from './print'
 import type {EditorDocument,GangSource} from './editor-document'
 import {updateGangAsset} from './editor-document'
 import {createHistory,recordHistory,moveHistory,type History} from './history'
+import {Trash2} from 'lucide-react'
 
 type Asset = {id:string;name:string;img:CanvasImageSource;naturalWidth:number;naturalHeight:number;widthCm:number;heightCm:number;quantity:number;document?:EditorDocument}
 export type ProjectActions={save:()=>void;open:()=>void}
 type Props = {source?:GangSource; onImportFile?:(file:File)=>void; onEditDocument?:(document:EditorDocument,name:string,id:string)=>void; previewColor?:string; onPreviewColorChange?:(value:string)=>void; getEditor?:()=>ProjectFile['editor']; restoreEditor?:(editor:ProjectFile['editor'])=>void; initialProject:ProjectFile;editorRevision:string;editorLoading:boolean;onSaveStatus:(s:ProjectSaveStatus)=>void;actionsRef?:Ref<ProjectActions>}
 type SavedAsset = {id:string;name:string;dataUrl:string;naturalWidth:number;naturalHeight:number;widthCm:number;heightCm:number;quantity:number;document?:EditorDocument}
 type GangSnapshot = {items:Asset[];projectName:string;width:number;height:number;dpi:number;gap:number;rotate:boolean;previewBg:string}
+type SheetPreset = {id:string;name:string;width:number;height:number}
 const sheetStorageKey = 'trama-dtf-gang-sheet-v1'
+const sheetPresetsStorageKey = 'trama-dtf-gang-sheet-presets-v1'
+function readSheetPresets():SheetPreset[] {
+  try {
+    const parsed=JSON.parse(localStorage.getItem(sheetPresetsStorageKey)||'[]')
+    return Array.isArray(parsed)?parsed.filter(p=>p&&typeof p.id==='string'&&typeof p.name==='string'&&Number.isFinite(p.width)&&p.width>0&&Number.isFinite(p.height)&&p.height>0):[]
+  } catch { return [] }
+}
 function savedSheetSettings() {
   try {
     const parsed = JSON.parse(localStorage.getItem('trama-dtf-sheet-settings') || '{}')
@@ -45,6 +54,8 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
   const [saveState,setSaveState]=useState('Cargando guardado…')
   const [acceptedResolution,setAcceptedResolution]=useState('')
   const [projectName,setProjectName] = useState(initialProject.name)
+  const [sheetPresets,setSheetPresets]=useState<SheetPreset[]>(readSheetPresets)
+  const [sheetPresetName,setSheetPresetName]=useState('')
   const input = useRef<HTMLInputElement>(null)
   const projectInput=useRef<HTMLInputElement>(null)
   const [projectBusy,setProjectBusy]=useState(false)
@@ -82,6 +93,16 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
     setItems(s.items);setProjectName(s.projectName);setWidth(s.width);setHeight(s.height);setDpi(s.dpi);setGap(s.gap);setRotate(s.rotate);setPreviewBg(s.previewBg);onPreviewColorChange?.(s.previewBg)
     setHistoryCounts({undo:next.past.length,redo:next.future.length})
   }
+  function saveSheetPreset(){
+    const name=sheetPresetName.trim()
+    if(!name||!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0)return
+    const next=[...sheetPresets.filter(p=>p.name.toLocaleLowerCase()!==name.toLocaleLowerCase()),{id:crypto.randomUUID(),name,width,height}]
+    setSheetPresets(next);localStorage.setItem(sheetPresetsStorageKey,JSON.stringify(next));setSheetPresetName('');setMessage(`Preset de plancha «${name}» guardado.`)
+  }
+  function deleteSheetPreset(id:string){
+    const next=sheetPresets.filter(p=>p.id!==id)
+    setSheetPresets(next);localStorage.setItem(sheetPresetsStorageKey,JSON.stringify(next))
+  }
   useImperativeHandle(actionsRef,()=>({save:()=>{void saveProject()},open:()=>projectInput.current?.click()}))
   async function saveProject() {
     setProjectBusy(true);setError('')
@@ -107,7 +128,6 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
   }
   const imported = useRef(0)
   const importMode = useRef<'adjust'|'raw'>('raw')
-  const sheetPresets = [[58,100,'58 × 100 cm'],[58,50,'58 × 50 cm'],[58,30,'58 × 30 cm'],[40,60,'40 × 60 cm'],[30,30,'30 × 30 cm']] as const
   const normalizeImage = (img:HTMLImageElement|HTMLCanvasElement) => {
     const normalized = document.createElement('canvas')
     normalized.width = img instanceof HTMLImageElement ? img.naturalWidth : img.width
@@ -226,7 +246,7 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
     <div className="sidebar-title">Gang Sheet <span className="save-indicator" role="status">● {saveState}</span></div>
     <div className="control-card open"><div className="section-heading">Plancha de impresión</div><div className="section-body">
       <label className="field">Nombre del trabajo<input aria-label="Nombre del trabajo" value={projectName} maxLength={80} onChange={e=>setProjectName(e.target.value)}/></label>
-      <div className="field"><span>Presets de plancha</span><div className="scale-presets sheet-presets">{sheetPresets.map(([w,h,label])=><button key={label} aria-pressed={width===w && height===h} onClick={()=>{setWidth(w);setHeight(h)}}>{label}</button>)}</div></div>
+      <div className="field"><span>Mis presets de plancha</span>{sheetPresets.length>0&&<div className="sheet-presets">{sheetPresets.map(p=><div className="sheet-preset" key={p.id}><button type="button" aria-pressed={width===p.width&&height===p.height} onClick={()=>{setWidth(p.width);setHeight(p.height)}}>{p.name}<small>{p.width} × {p.height} cm</small></button><button type="button" className="sheet-preset-delete" aria-label={`Eliminar preset ${p.name}`} title="Eliminar preset" onClick={()=>deleteSheetPreset(p.id)}><Trash2 size={14}/></button></div>)}</div>}<div className="sheet-preset-save"><input aria-label="Nombre del preset de plancha" placeholder="Nombre del preset" value={sheetPresetName} onChange={e=>setSheetPresetName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();saveSheetPreset()}}}/><button type="button" className="btn" disabled={!sheetPresetName.trim()} onClick={saveSheetPreset}>Guardar</button></div><small className="help-text">Ingresa ancho y alto, luego guarda la medida como preset.</small></div>
       <div className="dimension-fields"><label>Ancho (cm)<input type="number" aria-label="Ancho de plancha" min="1" value={width} onChange={e=>setWidth(Number(e.target.value))}/></label><label>Alto (cm)<input type="number" aria-label="Alto de plancha" min="1" value={height} onChange={e=>setHeight(Number(e.target.value))}/></label></div>
       <input hidden ref={projectInput} type="file" accept=".json,.trama.json" onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)void openProject(file)}}/>
       <p className="help-text">Autoguardado del proyecto completo en este navegador. Usa «Descargar proyecto» en la cabecera para una copia .trama.json. {projectBusy?'Procesando proyecto…':''}</p>
