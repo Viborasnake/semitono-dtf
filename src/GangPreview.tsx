@@ -1,4 +1,5 @@
-import {useEffect, useRef, useState} from 'react'
+import {useEffect, useRef, useState, type PointerEvent as ReactPointerEvent} from 'react'
+import {Hand, Minus, Plus, ZoomIn} from 'lucide-react'
 import type {Placement} from './packing'
 import {hitGangAsset} from './gang-selection'
 
@@ -11,6 +12,8 @@ export default function GangPreview({width,height,dpi,background,placements,item
   const [zoom,setZoom]=useState<number|null>(null)
   const [scroll,setScroll]=useState({x:0,y:0})
   const [landscape,setLandscape]=useState(false)
+  const [handActive,setHandActive]=useState(false)
+  const drag=useRef<{x:number;y:number;left:number;top:number}|null>(null)
   const pixelsW=Math.max(1,Math.round(width/2.54*dpi)||1)
   const pixelsH=Math.max(1,Math.round(height/2.54*dpi)||1)
   const displayPixelsW=landscape?pixelsH:pixelsW, displayPixelsH=landscape?pixelsW:pixelsH
@@ -73,16 +76,32 @@ export default function GangPreview({width,height,dpi,background,placements,item
     viewport.current?.scrollTo(0,0)
     setScroll({x:0,y:0})
   }
+  function startDrag(e:ReactPointerEvent<HTMLDivElement>) {
+    if(!handActive)return
+    drag.current={x:e.clientX,y:e.clientY,left:e.currentTarget.scrollLeft,top:e.currentTarget.scrollTop}
+    e.currentTarget.setPointerCapture(e.pointerId)
+  }
+  function moveDrag(e:ReactPointerEvent<HTMLDivElement>) {
+    const start=drag.current
+    if(!start)return
+    e.currentTarget.scrollLeft=start.left-(e.clientX-start.x)
+    e.currentTarget.scrollTop=start.top-(e.clientY-start.y)
+  }
+  function stopDrag(e:ReactPointerEvent<HTMLDivElement>) {
+    drag.current=null
+    if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId)
+  }
   return <div className="gang-preview-panel">
-    <div className="gang-zoom" role="group" aria-label="Zoom del Gang Sheet">
-      <button className="btn" aria-label="Alejar Gang Sheet" onClick={()=>changeZoom(scale/1.25)}>−</button>
-      <output aria-live="polite">{(scale*100).toFixed(1)}%</output>
-      <button className="btn" aria-label="Acercar Gang Sheet" onClick={()=>changeZoom(scale*1.25)}>+</button>
-      <button className="btn" aria-pressed={zoom===null} onClick={()=>changeZoom(null)}>Ajustar</button>
-      <button className="btn" aria-pressed={zoom===1} onClick={()=>changeZoom(1)}>100%</button>
-      <span>100% = 1 píxel de salida por píxel de vista · Desplázate para explorar</span>
+    <div className="gang-zoom zoom-control" role="group" aria-label="Zoom del Gang Sheet">
+      <button className="hand-button" aria-label="Mano para mover la plancha" aria-pressed={handActive} title="Mano: arrastra para mover la plancha" onClick={()=>setHandActive(v=>!v)}><Hand size={16}/></button>
+      <ZoomIn size={15}/>
+      <button aria-label="Alejar Gang Sheet" onClick={()=>changeZoom(scale/1.25)}><Minus size={14}/></button>
+      <span>{(scale*100).toFixed(1)}%</span>
+      <button aria-label="Acercar Gang Sheet" onClick={()=>changeZoom(scale*1.25)}><Plus size={14}/></button>
+      <button className="zoom-text" aria-pressed={zoom===null} onClick={()=>changeZoom(null)}>Ajustar</button>
+      <button className="zoom-text" aria-pressed={zoom===1} onClick={()=>changeZoom(1)}>100%</button>
     </div>
-    <div className="gang-viewport" ref={viewport} tabIndex={0} aria-label="Plancha con desplazamiento horizontal y vertical" onScroll={e=>setScroll({x:e.currentTarget.scrollLeft,y:e.currentTarget.scrollTop})}>
+    <div className={`gang-viewport ${handActive?'hand-active':''}`} ref={viewport} tabIndex={0} aria-label="Plancha con desplazamiento horizontal y vertical" onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={stopDrag} onPointerCancel={stopDrag} onLostPointerCapture={stopDrag} onScroll={e=>setScroll({x:e.currentTarget.scrollLeft,y:e.currentTarget.scrollTop})}>
       <div style={{width:areaW,height:areaH}}><canvas ref={canvas} style={{width:size.width,height:size.height,cursor:'pointer'}} aria-label="Vista previa del Gang Sheet. Clic para seleccionar, doble clic para editar." onClick={e=>onSelect?.(pick(e.clientX,e.clientY))} onDoubleClick={e=>{const id=pick(e.clientX,e.clientY);if(id)onEdit?.(id)}}/></div>
     </div>
     {!items.length&&<div className="empty-gang">Añade tu primer diseño desde el editor o importa un PNG.</div>}

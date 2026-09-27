@@ -236,6 +236,8 @@ input[type=checkbox] { accent-color:var(--aqua); }
 .gang-zoom output { min-width:55px; text-align:center; font-size:12px; font-variant-numeric:tabular-nums; }
 .gang-zoom span { color:#94aaa1; font-size:11px; }
 .gang-viewport { overflow:auto; min-height:0; min-width:0; overscroll-behavior:contain; }
+.gang-viewport.hand-active { cursor:grab; touch-action:none; user-select:none; }
+.gang-viewport.hand-active:active { cursor:grabbing; }
 .gang-viewport canvas { position:sticky; top:0; left:0; display:block; max-width:none; max-height:none; }
 .save-indicator { margin-left:auto; color:#70b99d; font-size:10px; font-weight:500; text-transform:none; letter-spacing:0; }
 .import-adjust { justify-content:center; }
