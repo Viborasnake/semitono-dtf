@@ -677,6 +677,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <button className="upload-mini" onClick={() => fileInput.current?.click()}><Upload size={15} /> Cambiar imagen</button>
             <input ref={fileInput} hidden type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(e) => { requestImport(e.target.files?.[0]); e.target.value='' }} />
           </div>
+          {processing && <div className="processing stage-processing"><span /> Procesando trama…</div>}
 
           <div className={`canvas-area ${handActive ? 'hand-active' : ''} ${panning ? 'is-panning' : ''}`} ref={viewportRef} onPointerDownCapture={startPan} onPointerMove={movePan} onPointerUp={stopPan} onPointerCancel={stopPan} onLostPointerCapture={stopPan}>
             {!fileName && <div className="start-upload"><Upload size={36}/><h2>Arrastra tu imagen aquí</h2><p>PNG, JPG, WebP o SVG</p><button className="btn export" disabled={loading} onClick={()=>fileInput.current?.click()}>{loading?'Abriendo imagen…':'Abrir imagen'}</button>{error && <p className="error-text" role="alert">{error}</p>}</div>}
@@ -684,7 +685,6 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               <canvas ref={sourceCanvas} className="art-canvas" style={{ clipPath: view === 'split' ? `inset(0 ${100 - split}% 0 0)` : 'none', visibility: view === 'result' ? 'hidden' : 'visible' }} />
               <div className="result-layer" style={{ clipPath: view === 'split' ? `inset(0 0 0 ${split}%)` : 'none', visibility: view === 'original' ? 'hidden' : 'visible' }}><canvas ref={resultCanvas} className="art-canvas" /></div>
               {view === 'split' && <><div className="split-line" style={{ left: `${split}%` }}><span><Minus /><Minus /></span></div><input className="split-input" aria-label="Divisor de comparación" type="range" min="0" max="100" value={split} onChange={(e) => setSplit(Number(e.target.value))} /></>}
-              {processing && <div className="processing"><span /> Procesando trama…</div>}
             </div>
             {dragging && <div className="drop-overlay"><Upload size={32} /><b>Suelta tu imagen aquí</b><span>PNG, JPG, WebP o SVG</span></div>}
           </div>
