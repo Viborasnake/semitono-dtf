@@ -4,7 +4,7 @@
 * { box-sizing: border-box; }
 [hidden] { display:none !important; }
 button:focus-visible, input:focus-visible, select:focus-visible { outline:2px solid var(--aqua); outline-offset:3px; }
-select { font:inherit; }
+select { font:inherit; appearance:none; padding-right:30px !important; cursor:pointer; background-image:linear-gradient(45deg,transparent 50%,#aebbb5 50%),linear-gradient(135deg,#aebbb5 50%,transparent 50%); background-position:calc(100% - 15px) 50%,calc(100% - 10px) 50%; background-size:5px 5px,5px 5px; background-repeat:no-repeat; }
 .field input:not([type=range]), .field select { width:100%; min-width:0; padding:9px; border:1px solid #35413b; border-radius:7px; background:#0b0e11; color:#e4ece8; }
 body { margin: 0; min-width: 320px; min-height: 100vh; overflow: hidden; }
 button, input { font: inherit; }
