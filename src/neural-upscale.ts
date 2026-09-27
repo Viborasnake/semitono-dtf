@@ -4,7 +4,7 @@ const PAD = 16
 // Experimental CPU/WASM path. Tiles keep peak memory bounded and the padded
 // overlap prevents visible seams when the model sees a tile boundary.
 export async function neuralUpscaleRgba(data: Uint8ClampedArray, width: number, height: number, scale: 2 | 4) {
-  const modelUrl = `/models/real_esrgan_x${scale}.onnx`
+  const modelUrl = `${import.meta.env.BASE_URL}models/real_esrgan_x${scale}.onnx`
   const useWebGpu = typeof navigator !== 'undefined' && 'gpu' in navigator
   const ort = await (useWebGpu ? import('onnxruntime-web/webgpu') : import('onnxruntime-web'))
   if (!useWebGpu) ort.env.wasm.numThreads = 1
