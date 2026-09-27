@@ -104,6 +104,5 @@ export default function GangPreview({width,height,dpi,background,placements,item
     <div className={`gang-viewport ${handActive?'hand-active':''}`} ref={viewport} tabIndex={0} aria-label="Plancha con desplazamiento horizontal y vertical" onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={stopDrag} onPointerCancel={stopDrag} onLostPointerCapture={stopDrag} onScroll={e=>setScroll({x:e.currentTarget.scrollLeft,y:e.currentTarget.scrollTop})}>
       <div style={{width:areaW,height:areaH}}><canvas ref={canvas} style={{width:size.width,height:size.height,cursor:'pointer'}} aria-label="Vista previa del Gang Sheet. Clic para seleccionar, doble clic para editar." onClick={e=>onSelect?.(pick(e.clientX,e.clientY))} onDoubleClick={e=>{const id=pick(e.clientX,e.clientY);if(id)onEdit?.(id)}}/></div>
     </div>
-    {!items.length&&<div className="empty-gang">Añade tu primer diseño desde el editor o importa un PNG.</div>}
   </div>
 }
