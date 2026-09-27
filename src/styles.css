@@ -231,8 +231,8 @@ input[type=checkbox] { accent-color:var(--aqua); }
 .gang-workspace .asset-selected { border-color:var(--aqua); }
 .warning-inline { color:#f0c989; }
 .asset-title .asset-select { background:transparent; color:inherit; text-align:left; min-width:0; overflow-wrap:anywhere; flex:1; }
-.gang-preview-panel { position:relative; min-height:0; min-width:0; display:grid; grid-template-rows:auto minmax(0,1fr); }
-.gang-zoom { display:flex; align-items:center; flex-wrap:wrap; gap:8px; padding:8px 12px; border-bottom:1px solid var(--line); }
+.gang-preview-panel { position:relative; min-height:0; min-width:0; display:grid; grid-template-rows:minmax(0,1fr) auto; }
+.gang-zoom { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:8px; padding:8px 12px; border-top:1px solid var(--line); background:#0d0f12; }
 .gang-zoom .btn { height:32px; padding:0 12px; }
 .gang-zoom .btn[aria-pressed="true"] { border-color:var(--aqua); color:var(--aqua); }
 .gang-zoom output { min-width:55px; text-align:center; font-size:12px; font-variant-numeric:tabular-nums; }

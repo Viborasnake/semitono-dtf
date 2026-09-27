@@ -92,6 +92,9 @@ export default function GangPreview({width,height,dpi,background,placements,item
     if(e.currentTarget.hasPointerCapture(e.pointerId))e.currentTarget.releasePointerCapture(e.pointerId)
   }
   return <div className="gang-preview-panel">
+    <div className={`gang-viewport ${handActive?'hand-active':''}`} ref={viewport} tabIndex={0} aria-label="Plancha con desplazamiento horizontal y vertical" onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={stopDrag} onPointerCancel={stopDrag} onLostPointerCapture={stopDrag} onScroll={e=>setScroll({x:e.currentTarget.scrollLeft,y:e.currentTarget.scrollTop})}>
+      <div style={{width:areaW,height:areaH}}><canvas ref={canvas} style={{width:size.width,height:size.height,cursor:'pointer'}} aria-label="Vista previa del Gang Sheet. Clic para seleccionar, doble clic para editar." onClick={e=>onSelect?.(pick(e.clientX,e.clientY))} onDoubleClick={e=>{const id=pick(e.clientX,e.clientY);if(id)onEdit?.(id)}}/></div>
+    </div>
     <div className="gang-zoom zoom-control" role="group" aria-label="Zoom del Gang Sheet">
       <button className="hand-button" aria-label="Mano para mover la plancha" aria-pressed={handActive} title="Mano: arrastra para mover la plancha" onClick={()=>setHandActive(v=>!v)}><Hand size={16}/></button>
       <ZoomIn size={15}/>
@@ -100,9 +103,6 @@ export default function GangPreview({width,height,dpi,background,placements,item
       <button aria-label="Acercar Gang Sheet" onClick={()=>changeZoom(scale*1.25)}><Plus size={14}/></button>
       <button className="zoom-text" aria-pressed={zoom===null} onClick={()=>changeZoom(null)}>Ajustar</button>
       <button className="zoom-text" aria-pressed={zoom===1} onClick={()=>changeZoom(1)}>100%</button>
-    </div>
-    <div className={`gang-viewport ${handActive?'hand-active':''}`} ref={viewport} tabIndex={0} aria-label="Plancha con desplazamiento horizontal y vertical" onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={stopDrag} onPointerCancel={stopDrag} onLostPointerCapture={stopDrag} onScroll={e=>setScroll({x:e.currentTarget.scrollLeft,y:e.currentTarget.scrollTop})}>
-      <div style={{width:areaW,height:areaH}}><canvas ref={canvas} style={{width:size.width,height:size.height,cursor:'pointer'}} aria-label="Vista previa del Gang Sheet. Clic para seleccionar, doble clic para editar." onClick={e=>onSelect?.(pick(e.clientX,e.clientY))} onDoubleClick={e=>{const id=pick(e.clientX,e.clientY);if(id)onEdit?.(id)}}/></div>
     </div>
   </div>
 }
