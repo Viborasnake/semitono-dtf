@@ -614,7 +614,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       </nav>
       <div className="gang-container" style={{display: tool === 'gang' ? 'block' : 'none'}}><GangSheet source={gangSource} onImportFile={requestImport} onEditDocument={editGangDocument} previewColor={previewBg} onPreviewColorChange={setPreviewBg} getEditor={snapshotEditor} restoreEditor={restoreProjectEditor} initialProject={initialProject} editorRevision={JSON.stringify([renderKey,fileName,editingAssetId,activeGarment])} editorLoading={loading} onSaveStatus={setProjectStatus} actionsRef={projectActions}/></div>
       <main className={`workspace ${prepressCollapsed || !fileName ? 'prepress-collapsed' : ''} ${!fileName ? 'empty-editor' : ''}`} style={{display: tool === 'design' ? undefined : 'none'}}>
-        <aside className="sidebar" id="prepress-panel" hidden={prepressCollapsed || !fileName}>
+        <aside className={`sidebar workflow-step-${workflowStep}`} id="prepress-panel" hidden={prepressCollapsed || !fileName}>
           <div className="sidebar-title"><div><Sparkles size={18} /><span>Pre-prensa</span></div><button aria-label="Información" aria-expanded={showInfo} onClick={() => setShowInfo(v => !v)}><Info size={17} /></button></div>
           {showInfo && <div className="tip-card"><p>1. Carga tu imagen y define tamaño y ppp. 2. Elige el fondo a eliminar, preset y bordes. 3. Revisa al 100% y sobre la prenda. 4. Exporta PNG o añade a una plancha. El tamaño se graba en el PNG; comprueba que tu RIP respete los centímetros indicados.</p></div>}
 

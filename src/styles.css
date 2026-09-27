@@ -111,6 +111,8 @@ input[type='range']::-webkit-slider-thumb { width: 13px; height: 13px; appearanc
 .workspace:not(.gang-workspace) > .sidebar > .control-card { height:auto; min-height:max-content; overflow:visible; border-radius:16px; }
 .workspace:not(.gang-workspace) > .sidebar > .control-card > .section-heading { border-radius:16px 16px 0 0; }
 .workspace:not(.gang-workspace) > .sidebar > .control-card > .section-heading::before { counter-increment: workflow-step; content: counter(workflow-step); width:24px; height:24px; flex:0 0 24px; display:grid; place-items:center; margin-right:8px; border:1px solid #376e62; border-radius:50%; color:var(--aqua); background:#153d37; font-size:11px; font-weight:800; }
+.workflow-step-1 > section:not(:nth-of-type(2)) { display:none; }
+.workflow-step-2 > section:nth-of-type(2) { display:none; }
 .workspace:not(.gang-workspace) > .sidebar > .control-card > .section-heading { justify-content:flex-start; }
 @media (min-width:1200px) {
   .workspace:not(.gang-workspace) { grid-template-columns:520px minmax(0,1fr); }
