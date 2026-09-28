@@ -27,7 +27,7 @@ self.onmessage = async (event) => {
     }
       progress(neural ? 62 : 42)
       const neuralWidth = sourceWidth * neuralScale, neuralHeight = sourceHeight * neuralScale
-      resized = sharpenRgba(neural ? resizeRgba(neural, neuralWidth, neuralHeight, width, height, 'lanczos3') : resizeRgba(data, sourceWidth, sourceHeight, width, height, settings.resampleMethod), width, height, settings.sharpness)
+      resized = sharpenRgba(neural ? resizeRgba(neural, neuralWidth, neuralHeight, width, height, 'lanczos3') : resizeRgba(data, sourceWidth, sourceHeight, width, height, 'lanczos3'), width, height, settings.sharpness)
     }
     progress(76)
     const result = halftone(autoAdjust(resized, settings), width, height, settings, resized)
