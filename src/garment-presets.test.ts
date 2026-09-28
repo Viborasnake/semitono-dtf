@@ -10,7 +10,7 @@ test('each garment has five halftone and three continuous presets, including one
     assert.equal(entries.filter(([,p])=>!p.values.preserveColor).length,1)
     for(const [,p]of entries){
       assert.equal(p.values.enabled,mode==='halftone')
-      assert.equal(p.values.solidAlpha,mode==='halftone')
+      assert.equal(p.values.solidAlpha,mode==='halftone'||p.values.background!=='none')
       assert.equal(p.values.autoTone,false);assert.equal(p.values.autoContrast,false)
       assert.equal(p.values.autoColor,false);assert.equal(p.values.sharpness,0)
       for(const key of ['dpi','widthCm','crop','trimMm','featherMm','cornerRadiusMm','edgeSides'])assert.equal(key in p.values,false)
@@ -32,7 +32,7 @@ test('one-color presets never output chromatic pixels, at every DPI and finish',
     }
     assert.ok(count>0)
     if(p.mode==='halftone')assert.equal(partial,0)
-    else assert.ok(partial>0)
+    else assert.equal(partial,0)
   }
 })
 test('category switches overwrite every processing value, not geometry or edges',()=>{
