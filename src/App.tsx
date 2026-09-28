@@ -318,6 +318,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       ? manualErase.current.data : new Uint8Array(canvas.width * canvas.height)
     eraseHistory.current.past.push(new Uint8Array(previous))
     eraseHistory.current.future = []
+    setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length,redo:history.current?.future.length??0})
     e.preventDefault(); e.stopPropagation(); brushing.current = e.pointerId
     e.currentTarget.setPointerCapture(e.pointerId); eraseAt(e)
   }
