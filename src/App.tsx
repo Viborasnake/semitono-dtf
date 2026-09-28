@@ -326,8 +326,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     const canvas = resultCanvas.current
     const point = brushPoint(e)
     if (canvas && point) {
-      const rect = canvas.getBoundingClientRect()
-      setBrushCursor({x: e.clientX - rect.left, y: e.clientY - rect.top})
+      setBrushCursor({x: e.clientX, y: e.clientY})
     }
     if (brushing.current !== e.pointerId) return
     e.preventDefault(); eraseAt(e)
