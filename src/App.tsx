@@ -495,6 +495,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           if (data.type === 'progress') { setProcessingProgress(data.progress); return }
           if (data.error) setError(data.error)
           else {
+            setExportMessage(data.warning || '')
             // Resize only when the replacement is ready: resizing clears canvas pixels.
             const originalPixels=new ImageData(data.original,width,height)
             const resultPixels=new ImageData(data.data,width,height)
