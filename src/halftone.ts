@@ -104,6 +104,10 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
         r=1-(1-r)*gainReduction;g=1-(1-g)*gainReduction;b=1-(1-b)*gainReduction
       }
     } else coverage = s.enabled === false ? 1 : 1 - (.2126 * r + .7152 * g + .0722 * b)
+    // Continuous solid-alpha DTF output must not promote barely visible matte
+    // residue into opaque ink. Keep real coverage opaque and discard the weak
+    // fringe/noise before the alpha channel is made binary.
+    if (s.enabled === false && s.solidAlpha && s.background !== 'none') coverage = coverage >= .5 ? 1 : 0
     const removed = coverage === 0 && s.background !== 'none'
     if (removed) { transparent++; continue }
     coverage = clamp((coverage - .5) * s.contrast / 100 + .5 + (s.brightness - 100) / 100)
