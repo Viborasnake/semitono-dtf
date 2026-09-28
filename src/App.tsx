@@ -327,7 +327,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     const point = brushPoint(e)
     if (canvas && point) {
       const rect = canvas.getBoundingClientRect()
-      setBrushCursor({x: (e.clientX - rect.left) * (rect.width / canvas.width), y: (e.clientY - rect.top) * (rect.height / canvas.height)})
+      setBrushCursor({x: e.clientX - rect.left, y: e.clientY - rect.top})
     }
     if (brushing.current !== e.pointerId) return
     e.preventDefault(); eraseAt(e)
@@ -872,7 +872,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <div className="artboard" hidden={!fileName} style={{ width: Math.max(1, visibleSize.width * previewScale), height: Math.max(1, visibleSize.height * previewScale), aspectRatio: `${visibleSize.width} / ${visibleSize.height}`, ...(previewBg !== 'checker' ? { backgroundImage: 'none', backgroundColor: previewBg } : {}) }}>
               <canvas ref={sourceCanvas} className="art-canvas" style={{ clipPath: view === 'split' ? `inset(0 ${100 - split}% 0 0)` : 'none', visibility: view === 'result' ? 'hidden' : 'visible' }} />
               <div className="result-layer" style={{ clipPath: view === 'split' ? `inset(0 0 0 ${split}%)` : 'none', visibility: view === 'original' ? 'hidden' : 'visible' }}><canvas ref={resultCanvas} className="art-canvas" /></div>
-              {brushTool && brushCursor && <div className="brush-cursor" style={{left: brushCursor.x, top: brushCursor.y, width: brushSize * previewScale, height: brushSize * previewScale}} aria-hidden="true" />}
+              {brushTool && brushCursor && resultCanvas.current && <div className="brush-cursor" style={{left: brushCursor.x, top: brushCursor.y, width: brushSize * resultCanvas.current.getBoundingClientRect().width / resultCanvas.current.width, height: brushSize * resultCanvas.current.getBoundingClientRect().height / resultCanvas.current.height}} aria-hidden="true" />}
               {view === 'split' && !brushTool && <><div className="split-line" style={{ left: `${split}%` }}><span><Minus /><Minus /></span></div><input className="split-input" aria-label="Divisor de comparación" type="range" min="0" max="100" value={split} onChange={(e) => setSplit(Number(e.target.value))} /></>}
             </div>
             {dragging && <div className="drop-overlay"><Upload size={32} /><b>Suelta tu imagen aquí</b><span>PNG, JPG, WebP o SVG</span></div>}
