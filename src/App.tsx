@@ -158,7 +158,10 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [handTool, setHandTool] = useState(false)
   const [brushTool, setBrushTool] = useState(false)
   const [brushSize, setBrushSize] = useState(24)
+  const [brushCursor, setBrushCursor] = useState<{x:number;y:number}|null>(null)
   const manualErase = useRef<{data:Uint8Array;width:number;height:number}|null>(null)
+  const manualBase = useRef<{data:Uint8ClampedArray;width:number;height:number}|null>(null)
+  const eraseHistory = useRef<{past:Uint8Array[];future:Uint8Array[]}>({past:[],future:[]})
   const brushing = useRef<number|null>(null)
   const [spaceHeld, setSpaceHeld] = useState(false)
   const [panning, setPanning] = useState(false)
@@ -212,7 +215,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     const snapshot={settings,widthCm,dpi,crop,dimensions,garment:activeGarment}
     if(!history.current || historyImage.current!==imageVersion){history.current=createHistory(snapshot);historyImage.current=imageVersion}
     else history.current=recordHistory(history.current,snapshot,gesture.current)
-    setHistoryCounts({undo:history.current.past.length,redo:history.current.future.length})
+    setHistoryCounts({undo:history.current.past.length+eraseHistory.current.past.length,redo:history.current.future.length+eraseHistory.current.future.length})
   },[settings,widthCm,dpi,crop,dimensions,imageVersion,loading,activeGarment])
   useEffect(() => {
     const close = (event: PointerEvent) => {
@@ -222,13 +225,25 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     return () => document.removeEventListener('pointerdown', close)
   }, [])
   const navigateHistory=(direction:'undo'|'redo')=>{
+    const eraseStack = eraseHistory.current
+    const eraseList = direction === 'undo' ? eraseStack.past : eraseStack.future
+    if (!loading && eraseList.length && resultCanvas.current && manualErase.current) {
+      const current = new Uint8Array(manualErase.current.data)
+      const next = eraseList.pop()!
+      if (direction === 'undo') eraseStack.future.push(current)
+      else eraseStack.past.push(current)
+      manualErase.current.data = new Uint8Array(next)
+      renderManualErase(resultCanvas.current)
+      setHistoryCounts({undo:(history.current?.past.length??0)+eraseStack.past.length,redo:(history.current?.future.length??0)+eraseStack.future.length})
+      return
+    }
     if(!history.current || loading)return
     const next=moveHistory(history.current,direction)
     if(next===history.current)return
     history.current=next;gesture.current++
     const s=next.present
     setSettings(s.settings);setGarment(s.garment);setWidthCm(s.widthCm);setDpi(s.dpi);setCrop(s.crop);setDimensions(s.dimensions);setPreset('custom')
-    setHistoryCounts({undo:next.past.length,redo:next.future.length})
+    setHistoryCounts({undo:next.past.length+eraseStack.past.length,redo:next.future.length+eraseStack.future.length})
   }
 
   useEffect(() => {
@@ -297,20 +312,37 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   }
   const startBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!brushTool || e.button !== 0 || view === 'original' || processing || exporting) return
+    const canvas = resultCanvas.current
+    if (!canvas) return
+    const previous = manualErase.current?.width === canvas.width && manualErase.current?.height === canvas.height
+      ? manualErase.current.data : new Uint8Array(canvas.width * canvas.height)
+    eraseHistory.current.past.push(new Uint8Array(previous))
+    eraseHistory.current.future = []
     e.preventDefault(); e.stopPropagation(); brushing.current = e.pointerId
     e.currentTarget.setPointerCapture(e.pointerId); eraseAt(e)
   }
   const moveBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const canvas = resultCanvas.current
+    const point = brushPoint(e)
+    if (canvas && point) {
+      const rect = canvas.getBoundingClientRect()
+      setBrushCursor({x: (e.clientX - rect.left) * (rect.width / canvas.width), y: (e.clientY - rect.top) * (rect.height / canvas.height)})
+    }
     if (brushing.current !== e.pointerId) return
     e.preventDefault(); eraseAt(e)
   }
   const stopBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (brushing.current !== e.pointerId) return
     brushing.current = null
+    setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length,redo:(history.current?.future.length??0)+eraseHistory.current.future.length})
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
   }
 
-  const applyManualErase = (canvas: HTMLCanvasElement) => {
+  const renderManualErase = (canvas: HTMLCanvasElement) => {
+    const base = manualBase.current
+    if (base?.width === canvas.width && base.height === canvas.height) {
+      canvas.getContext('2d')!.putImageData(new ImageData(new Uint8ClampedArray(base.data), base.width, base.height), 0, 0)
+    }
     const saved = manualErase.current
     if (!saved || saved.width !== canvas.width || saved.height !== canvas.height) return
     const ctx = canvas.getContext('2d')!
@@ -416,6 +448,8 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       if (!img.naturalWidth || !img.naturalHeight) { setError('La imagen no tiene dimensiones válidas.'); setLoading(false); return }
       imageRef.current = img
       manualErase.current = null
+      manualBase.current = null
+      eraseHistory.current = {past:[],future:[]}
       setBrushTool(false)
       setCrop(document?.crop ?? null)
       setEditingAssetId(assetId)
@@ -469,7 +503,8 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             src.height = out.height = height
             src.getContext('2d')!.putImageData(originalPixels, 0, 0)
             out.getContext('2d')!.putImageData(resultPixels, 0, 0)
-            applyManualErase(out)
+            manualBase.current={data:new Uint8ClampedArray(data.data),width,height}
+            renderManualErase(out)
             setDisplaySize({width,height})
             setTransparent(data.transparent)
             setReadyKey(renderKey)
@@ -831,11 +866,12 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <button type="button" className="processing-stop" onClick={stopProcessing}>Detener</button>
           </div>}
 
-          <div className={`canvas-area ${handActive ? 'hand-active' : ''} ${panning ? 'is-panning' : ''} ${brushTool ? 'brush-active' : ''}`} ref={viewportRef} onPointerDownCapture={startPan} onPointerDown={startBrush} onPointerMove={e=>{movePan(e);moveBrush(e)}} onPointerUp={e=>{stopPan(e);stopBrush(e)}} onPointerCancel={e=>{stopPan(e);stopBrush(e)}} onLostPointerCapture={e=>{stopPan(e);stopBrush(e)}}>
+          <div className={`canvas-area ${handActive ? 'hand-active' : ''} ${panning ? 'is-panning' : ''} ${brushTool ? 'brush-active' : ''}`} ref={viewportRef} onPointerDownCapture={startPan} onPointerDown={startBrush} onPointerMove={e=>{movePan(e);moveBrush(e)}} onPointerLeave={()=>setBrushCursor(null)} onPointerUp={e=>{stopPan(e);stopBrush(e)}} onPointerCancel={e=>{stopPan(e);stopBrush(e)}} onLostPointerCapture={e=>{stopPan(e);stopBrush(e)}}>
             {!fileName && <div className="start-upload"><Upload size={36}/><h2>Arrastra tu imagen aquí</h2><p>PNG, JPG, WebP o SVG</p><button className="btn export" disabled={loading} onClick={()=>fileInput.current?.click()}>{loading?'Abriendo imagen…':'Abrir imagen'}</button>{error && <p className="error-text" role="alert">{error}</p>}</div>}
             <div className="artboard" hidden={!fileName} style={{ width: Math.max(1, visibleSize.width * previewScale), height: Math.max(1, visibleSize.height * previewScale), aspectRatio: `${visibleSize.width} / ${visibleSize.height}`, ...(previewBg !== 'checker' ? { backgroundImage: 'none', backgroundColor: previewBg } : {}) }}>
               <canvas ref={sourceCanvas} className="art-canvas" style={{ clipPath: view === 'split' ? `inset(0 ${100 - split}% 0 0)` : 'none', visibility: view === 'result' ? 'hidden' : 'visible' }} />
               <div className="result-layer" style={{ clipPath: view === 'split' ? `inset(0 0 0 ${split}%)` : 'none', visibility: view === 'original' ? 'hidden' : 'visible' }}><canvas ref={resultCanvas} className="art-canvas" /></div>
+              {brushTool && brushCursor && <div className="brush-cursor" style={{left: brushCursor.x, top: brushCursor.y, width: brushSize * previewScale, height: brushSize * previewScale}} aria-hidden="true" />}
               {view === 'split' && !brushTool && <><div className="split-line" style={{ left: `${split}%` }}><span><Minus /><Minus /></span></div><input className="split-input" aria-label="Divisor de comparación" type="range" min="0" max="100" value={split} onChange={(e) => setSplit(Number(e.target.value))} /></>}
             </div>
             {dragging && <div className="drop-overlay"><Upload size={32} /><b>Suelta tu imagen aquí</b><span>PNG, JPG, WebP o SVG</span></div>}
