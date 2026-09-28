@@ -195,7 +195,8 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [previewBg, setPreviewBg] = useState('checker')
   const [error, setError] = useState('')
   const loadId = useRef(0)
-  const [collapsedPanels, setCollapsedPanels] = useState({presets:false, size:false, background:false, trama:false, ajustes:false, edges:false})
+  const [collapsedPanels, setCollapsedPanels] = useState({presets:true, size:true, background:true, trama:true, ajustes:true, edges:true})
+  const openWorkflowPanel = (panel:'size'|'trama') => setCollapsedPanels({presets:true, size:true, background:true, trama:true, ajustes:true, edges:true, [panel]:false})
   const [displaySize,setDisplaySize]=useState<{width:number;height:number}|null>(null)
   type Snapshot = {settings:Settings;widthCm:string;dpi:number;crop:CropRect|null;dimensions:{width:number;height:number};garment:GarmentTone}
   const history=useRef<History<Snapshot>|null>(null)
@@ -610,9 +611,9 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       </div>
 
       <nav className="tool-tabs" aria-label="Flujo de trabajo">
-        <button className={`workflow-step ${workflowStep === 1 ? 'active' : ''}`} aria-current={workflowStep === 1 ? 'step' : undefined} onClick={() => { setWorkflowStep(1); setTool('design'); setCollapsedPanels(s => ({...s, size:false})) }}><b>1</b><span>Tamaño</span></button>
+        <button className={`workflow-step ${workflowStep === 1 ? 'active' : ''}`} aria-current={workflowStep === 1 ? 'step' : undefined} onClick={() => { setWorkflowStep(1); setTool('design'); openWorkflowPanel('size') }}><b>1</b><span>Tamaño</span></button>
         <i className="workflow-connector" aria-hidden="true" />
-        <button className={`workflow-step ${workflowStep === 2 ? 'active' : ''}`} aria-current={workflowStep === 2 ? 'step' : undefined} onClick={() => { setWorkflowStep(2); setTool('design'); setCollapsedPanels(s => ({...s, trama:false})) }}><b>2</b><span>Semitono</span></button>
+        <button className={`workflow-step ${workflowStep === 2 ? 'active' : ''}`} aria-current={workflowStep === 2 ? 'step' : undefined} onClick={() => { setWorkflowStep(2); setTool('design'); openWorkflowPanel('trama') }}><b>2</b><span>Semitono</span></button>
         <i className="workflow-connector" aria-hidden="true" />
         <button className={`workflow-step ${workflowStep === 3 ? 'active' : ''}`} aria-current={workflowStep === 3 ? 'step' : undefined} onClick={() => { setWorkflowStep(3); setTool('gang') }}><b>3</b><span>Gang Sheet</span></button>
         <span>Todo se procesa en tu equipo</span>
