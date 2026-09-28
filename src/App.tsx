@@ -350,6 +350,13 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     for (let p = 0; p < saved.data.length; p++) if (saved.data[p]) image.data[p * 4 + 3] = 0
     ctx.putImageData(image, 0, 0)
   }
+  const clearManualBrush = () => {
+    manualErase.current = null
+    eraseHistory.current = {past:[],future:[]}
+    setBrushCursor(null)
+    setHistoryCounts({undo:history.current?.past.length??0,redo:history.current?.future.length??0})
+    if (resultCanvas.current) renderManualErase(resultCanvas.current)
+  }
   const movePan = (e: ReactPointerEvent<HTMLDivElement>) => {
     const pan = panStart.current
     if (!pan || pan.id !== e.pointerId) return
@@ -377,6 +384,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const applyPreset = (key:string) => {
     const p=presets[key]
     if(!p)return
+    clearManualBrush()
     setSettings(s=>({...s,...p.values}))
     setGarment(p.garment);setPreset(key);setPresetMessage('')
     setPreviewBg(p.garment==='light'?'white':'black');setView('result')
@@ -831,6 +839,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <div className="brush-tools">
               <button type="button" className={`btn ${brushTool ? 'active' : ''}`} onClick={() => {setBrushTool(v => !v);setHandTool(false)}} disabled={!output || processing}>{brushTool ? 'Cerrar pincel' : 'Pincel borrar'}</button>
               {brushTool && <RangeControl label="Tamaño del pincel" value={brushSize} min={4} max={120} unit=" px" onChange={setBrushSize} />}
+              {brushTool && <button type="button" className="text-button" onClick={clearManualBrush}>Restaurar borrado del pincel</button>}
               {brushTool && <p className="help-text">Arrastra sobre las pintitas o bordes contaminados. Solo se borra el resultado; la imagen original permanece intacta.</p>}
             </div>
             <p className="help-text">Borra el contorno rectangular, suaviza los lados y permite redondear las cuatro esquinas. El tamaño del lienzo se conserva.</p>
