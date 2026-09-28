@@ -156,6 +156,10 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [fit, setFit] = useState(true)
   const viewportRef = useRef<HTMLDivElement>(null)
   const [handTool, setHandTool] = useState(false)
+  const [brushTool, setBrushTool] = useState(false)
+  const [brushSize, setBrushSize] = useState(24)
+  const manualErase = useRef<{data:Uint8Array;width:number;height:number}|null>(null)
+  const brushing = useRef<number|null>(null)
   const [spaceHeld, setSpaceHeld] = useState(false)
   const [panning, setPanning] = useState(false)
   const panStart = useRef<{id:number;x:number;y:number;left:number;top:number} | null>(null)
@@ -249,6 +253,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   }, [tool])
 
   const startPan = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (brushTool) return
     if ((!handActive && e.button !== 1) || (e.button !== 0 && e.button !== 1)) return
     if (e.target instanceof Element && e.target.closest('.preview-background')) return
     e.preventDefault()
@@ -257,6 +262,61 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     panStart.current = {id:e.pointerId,x:e.clientX,y:e.clientY,left:el.scrollLeft,top:el.scrollTop}
     el.setPointerCapture(e.pointerId)
     setPanning(true)
+  }
+
+  const brushPoint = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const canvas = resultCanvas.current
+    if (!canvas) return null
+    const rect = canvas.getBoundingClientRect()
+    if (!rect.width || !rect.height) return null
+    return {
+      x: Math.max(0, Math.min(canvas.width - 1, (e.clientX - rect.left) * canvas.width / rect.width)),
+      y: Math.max(0, Math.min(canvas.height - 1, (e.clientY - rect.top) * canvas.height / rect.height)),
+    }
+  }
+  const eraseAt = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const canvas = resultCanvas.current
+    const point = brushPoint(e)
+    if (!canvas || !point || !canvas.width || !canvas.height) return
+    const mask = manualErase.current?.width === canvas.width && manualErase.current?.height === canvas.height
+      ? manualErase.current.data
+      : new Uint8Array(canvas.width * canvas.height)
+    manualErase.current = {data: mask, width: canvas.width, height: canvas.height}
+    const radius = Math.max(1, brushSize / 2 * canvas.width / canvas.getBoundingClientRect().width)
+    const left = Math.max(0, Math.floor(point.x - radius)), right = Math.min(canvas.width - 1, Math.ceil(point.x + radius))
+    const top = Math.max(0, Math.floor(point.y - radius)), bottom = Math.min(canvas.height - 1, Math.ceil(point.y + radius))
+    const ctx = canvas.getContext('2d')!
+    const pixels = ctx.getImageData(left, top, right - left + 1, bottom - top + 1)
+    for (let y = top; y <= bottom; y++) for (let x = left; x <= right; x++) {
+      if (Math.hypot(x + .5 - point.x, y + .5 - point.y) > radius) continue
+      const p = y * canvas.width + x
+      mask[p] = 1
+      pixels.data[((y - top) * pixels.width + x - left) * 4 + 3] = 0
+    }
+    ctx.putImageData(pixels, left, top)
+  }
+  const startBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!brushTool || e.button !== 0 || view === 'original' || processing || exporting) return
+    e.preventDefault(); e.stopPropagation(); brushing.current = e.pointerId
+    e.currentTarget.setPointerCapture(e.pointerId); eraseAt(e)
+  }
+  const moveBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (brushing.current !== e.pointerId) return
+    e.preventDefault(); eraseAt(e)
+  }
+  const stopBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (brushing.current !== e.pointerId) return
+    brushing.current = null
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+  }
+
+  const applyManualErase = (canvas: HTMLCanvasElement) => {
+    const saved = manualErase.current
+    if (!saved || saved.width !== canvas.width || saved.height !== canvas.height) return
+    const ctx = canvas.getContext('2d')!
+    const image = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    for (let p = 0; p < saved.data.length; p++) if (saved.data[p]) image.data[p * 4 + 3] = 0
+    ctx.putImageData(image, 0, 0)
   }
   const movePan = (e: ReactPointerEvent<HTMLDivElement>) => {
     const pan = panStart.current
@@ -355,6 +415,8 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       if (id !== loadId.current) return
       if (!img.naturalWidth || !img.naturalHeight) { setError('La imagen no tiene dimensiones válidas.'); setLoading(false); return }
       imageRef.current = img
+      manualErase.current = null
+      setBrushTool(false)
       setCrop(document?.crop ?? null)
       setEditingAssetId(assetId)
       if(document){setSettings({...document.settings,edgeSides:[...document.settings.edgeSides]});if(document.garment)setGarment(document.garment);setPreset('custom')}
@@ -407,6 +469,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             src.height = out.height = height
             src.getContext('2d')!.putImageData(originalPixels, 0, 0)
             out.getContext('2d')!.putImageData(resultPixels, 0, 0)
+            applyManualErase(out)
             setDisplaySize({width,height})
             setTransparent(data.transparent)
             setReadyKey(renderKey)
@@ -728,6 +791,11 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <RangeControl label="Desvanecido hacia dentro" value={settings.featherMm} min={0} max={30} step={0.5} unit=" mm" onChange={v => update('featherMm', v)} />
             <RangeControl label="Radio de esquinas" value={settings.cornerRadiusMm} min={0} max={50} step={0.5} unit=" mm" onChange={v => update('cornerRadiusMm', v)} />
             <div className="edge-sides">{['Arriba', 'Derecha', 'Abajo', 'Izquierda'].map((label, index) => <label key={label}><input type="checkbox" checked={settings.edgeSides[index]} onChange={e => update('edgeSides', settings.edgeSides.map((v, i) => i === index ? e.target.checked : v))} />{label}</label>)}</div>
+            <div className="brush-tools">
+              <button type="button" className={`btn ${brushTool ? 'active' : ''}`} onClick={() => {setBrushTool(v => !v);setHandTool(false)}} disabled={!output || processing}>{brushTool ? 'Cerrar pincel' : 'Pincel borrar'}</button>
+              {brushTool && <RangeControl label="Tamaño del pincel" value={brushSize} min={4} max={120} unit=" px" onChange={setBrushSize} />}
+              {brushTool && <p className="help-text">Arrastra sobre las pintitas o bordes contaminados. Solo se borra el resultado; la imagen original permanece intacta.</p>}
+            </div>
             <p className="help-text">Borra el contorno rectangular, suaviza los lados y permite redondear las cuatro esquinas. El tamaño del lienzo se conserva.</p>
           </div></section>
           <div className="tip-card"><div><Check size={14} /> {processing ? 'ACTUALIZANDO…' : `${transparent}% TRANSPARENTE`}</div><p>{settings.background==='custom'?'Se quitan los colores muestreados en toda la imagen. Puedes revisar o modificar la selección con el gotero.':settings.background === 'black' ? 'El negro lo aporta la prenda. Se eliminan los tonos oscuros del diseño completo.' : settings.background === 'white' ? settings.whiteRemoval==='connected'?'Se quita el fondo claro conectado al borde; se conservan los detalles interiores.':'Se eliminan los blancos del diseño completo.' : settings.enabled?'Se conserva el color y se perfora con la trama.':'Se conserva la imagen sin generar puntos.'} El fondo de vista previa no se exporta.</p></div>
@@ -763,12 +831,12 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <button type="button" className="processing-stop" onClick={stopProcessing}>Detener</button>
           </div>}
 
-          <div className={`canvas-area ${handActive ? 'hand-active' : ''} ${panning ? 'is-panning' : ''}`} ref={viewportRef} onPointerDownCapture={startPan} onPointerMove={movePan} onPointerUp={stopPan} onPointerCancel={stopPan} onLostPointerCapture={stopPan}>
+          <div className={`canvas-area ${handActive ? 'hand-active' : ''} ${panning ? 'is-panning' : ''} ${brushTool ? 'brush-active' : ''}`} ref={viewportRef} onPointerDownCapture={startPan} onPointerDown={startBrush} onPointerMove={e=>{movePan(e);moveBrush(e)}} onPointerUp={e=>{stopPan(e);stopBrush(e)}} onPointerCancel={e=>{stopPan(e);stopBrush(e)}} onLostPointerCapture={e=>{stopPan(e);stopBrush(e)}}>
             {!fileName && <div className="start-upload"><Upload size={36}/><h2>Arrastra tu imagen aquí</h2><p>PNG, JPG, WebP o SVG</p><button className="btn export" disabled={loading} onClick={()=>fileInput.current?.click()}>{loading?'Abriendo imagen…':'Abrir imagen'}</button>{error && <p className="error-text" role="alert">{error}</p>}</div>}
             <div className="artboard" hidden={!fileName} style={{ width: Math.max(1, visibleSize.width * previewScale), height: Math.max(1, visibleSize.height * previewScale), aspectRatio: `${visibleSize.width} / ${visibleSize.height}`, ...(previewBg !== 'checker' ? { backgroundImage: 'none', backgroundColor: previewBg } : {}) }}>
               <canvas ref={sourceCanvas} className="art-canvas" style={{ clipPath: view === 'split' ? `inset(0 ${100 - split}% 0 0)` : 'none', visibility: view === 'result' ? 'hidden' : 'visible' }} />
               <div className="result-layer" style={{ clipPath: view === 'split' ? `inset(0 0 0 ${split}%)` : 'none', visibility: view === 'original' ? 'hidden' : 'visible' }}><canvas ref={resultCanvas} className="art-canvas" /></div>
-              {view === 'split' && <><div className="split-line" style={{ left: `${split}%` }}><span><Minus /><Minus /></span></div><input className="split-input" aria-label="Divisor de comparación" type="range" min="0" max="100" value={split} onChange={(e) => setSplit(Number(e.target.value))} /></>}
+              {view === 'split' && !brushTool && <><div className="split-line" style={{ left: `${split}%` }}><span><Minus /><Minus /></span></div><input className="split-input" aria-label="Divisor de comparación" type="range" min="0" max="100" value={split} onChange={(e) => setSplit(Number(e.target.value))} /></>}
             </div>
             {dragging && <div className="drop-overlay"><Upload size={32} /><b>Suelta tu imagen aquí</b><span>PNG, JPG, WebP o SVG</span></div>}
           </div>
