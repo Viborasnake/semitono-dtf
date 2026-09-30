@@ -5,7 +5,7 @@ import type {CropRect} from './CropPanel'
 
 export default function ColorRangePanel({image,crop,initial,onApply,onCancel}:{image:HTMLImageElement;crop:CropRect|null;initial:ColorRange;onApply:(value:ColorRange)=>void;onCancel:()=>void}) {
   const [range,setRange]=useState<ColorRange>(()=>structuredClone(initial))
-  const [add,setAdd]=useState(false),[selection,setSelection]=useState(true),[message,setMessage]=useState('')
+  const [add,setAdd]=useState(false),[selection,setSelection]=useState(true),[message,setMessage]=useState(''),[sourceZoom,setSourceZoom]=useState(1)
   const source=useRef<HTMLCanvasElement>(null),preview=useRef<HTMLCanvasElement>(null),dialog=useRef<HTMLElement>(null)
   const region=crop??{x:0,y:0,width:image.naturalWidth,height:image.naturalHeight}
   const scale=Math.min(520/region.width,460/region.height,1)
@@ -54,7 +54,7 @@ export default function ColorRangePanel({image,crop,initial,onApply,onCancel}:{i
     <header><h2 id="color-range-title">Rango de color</h2><button className="btn" aria-label="Cerrar rango de color" onClick={onCancel}><X size={18}/></button></header>
     <p className="help-text">Haz clic en el original para elegir el color que quieres quitar. Las muestras se toman antes de las correcciones de imagen.</p>
     <div className="range-preview-grid">
-      <figure><figcaption>Original · haz clic para usar el gotero</figcaption><div className="range-canvas-wrap"><canvas ref={source} onClick={sample} aria-label="Imagen original para muestrear color"/></div></figure>
+      <figure><figcaption>Original · haz clic para usar el gotero</figcaption><div className="range-canvas-wrap range-source-wrap"><canvas ref={source} className="range-source-canvas" style={{width:`${width*sourceZoom}px`,height:`${height*sourceZoom}px`}} onClick={sample} aria-label="Imagen original para muestrear color"/></div><div className="range-zoom" aria-label="Zoom del gotero"><span>Zoom</span><button className="btn" disabled={sourceZoom===1} onClick={()=>setSourceZoom(z=>Math.max(1,z/2))} aria-label="Alejar el gotero">−</button><output>{sourceZoom}×</output><button className="btn" disabled={sourceZoom===8} onClick={()=>setSourceZoom(z=>Math.min(8,z*2))} aria-label="Acercar el gotero">+</button><button className="btn" disabled={sourceZoom===1} onClick={()=>setSourceZoom(1)}>Ajustar</button></div></figure>
       <figure><figcaption>{selection?'Selección · blanco = quitar, negro = conservar':'Resultado del recorte · sin semitono'}</figcaption><div className="range-canvas-wrap"><canvas ref={preview}/></div></figure>
     </div>
     <div className="range-toolbar"><div className="segmented"><button className={!add?'active':''} aria-pressed={!add} onClick={()=>setAdd(false)}><Pipette size={16}/> Reemplazar muestra</button><button className={add?'active':''} aria-pressed={add} onClick={()=>setAdd(true)}><Plus size={16}/> Añadir muestra</button></div><label className="field">Vista previa<select value={selection?'mask':'image'} onChange={e=>setSelection(e.target.value==='mask')}><option value="mask">Selección</option><option value="image">Imagen recortada</option></select></label></div>
