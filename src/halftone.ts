@@ -42,6 +42,19 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
   const solidAlpha=s.solidAlpha === true || (s.enabled !== false && s.solidAlpha !== false)
   const offsets = solidAlpha ? [.5] : [.25, .75]
   const samples = offsets.length ** 2
+  // In continuous solid-alpha mode, isolated low-level JPEG/compression noise
+  // must not become opaque ink. Keep weak pixels only when they touch a real
+  // foreground pixel, which preserves anti-aliased contours without retaining
+  // speckles across a dark matte.
+  const solidBlack = s.enabled === false && s.solidAlpha && processingBackground === 'black'
+  const strongBlack = solidBlack ? new Uint8Array(width * height) : null
+  if (strongBlack) {
+    const strongCutoff = (1 + s.tolerance / 255) / 2
+    for (let p = 0; p < width * height; p++) {
+      const i = p * 4
+      strongBlack[p] = data[i + 3] && Math.max(data[i], data[i + 1], data[i + 2]) / 255 >= strongCutoff ? 1 : 0
+    }
+  }
   let transparent = 0
   const clamp = (v: number) => Math.max(0, Math.min(1, v))
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
@@ -104,6 +117,15 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
         r=1-(1-r)*gainReduction;g=1-(1-g)*gainReduction;b=1-(1-b)*gainReduction
       }
     } else coverage = s.enabled === false ? 1 : 1 - (.2126 * r + .7152 * g + .0722 * b)
+    if (solidBlack && coverage > 0 && coverage < .5) {
+      let connected = false
+      for (let oy = -1; oy <= 1 && !connected; oy++) for (let ox = -1; ox <= 1; ox++) {
+        if (!ox && !oy) continue
+        const nx = x + ox, ny = y + oy
+        if (nx >= 0 && nx < width && ny >= 0 && ny < height && strongBlack![ny * width + nx]) { connected = true; break }
+      }
+      if (!connected) coverage = 0
+    }
     const removed = coverage === 0 && s.background !== 'none'
     if (removed) { transparent++; continue }
     coverage = clamp((coverage - .5) * s.contrast / 100 + .5 + (s.brightness - 100) / 100)
