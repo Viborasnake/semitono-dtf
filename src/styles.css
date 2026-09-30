@@ -342,6 +342,9 @@ input[type=checkbox] { accent-color:var(--aqua); }
 .asset-rename { display:flex; gap:6px; align-items:center; flex:1; min-width:0; }
 .asset-rename input { min-width:0; flex:1; }
 .asset-rename .btn, .asset-rename-button { min-height:28px; padding:4px 8px; font-size:12px; }
+.asset-title-renaming { cursor:default; }
+.asset-title-renaming .asset-rename { width:100%; }
+.asset-title-renaming .asset-rename input { min-width:0; width:100%; }
 .asset-collapse { transition:transform .18s ease; }
 .asset-collapse[aria-expanded="false"] { transform:rotate(-90deg); }
 .section-heading { min-height:48px; height:auto; padding-top:10px; padding-bottom:10px; gap:6px; }
