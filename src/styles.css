@@ -327,15 +327,17 @@ input[type=checkbox] { accent-color:var(--aqua); }
 .import-detail { margin:12px 0 4px; padding:10px; border:1px solid #2b4439; border-radius:10px; background:#101613; }.import-detail-head { display:flex; align-items:center; justify-content:space-between; color:#d8e6df; font-size:12px; font-weight:700; }.import-detail-head .scale-presets { margin:0; }.import-detail-head .scale-presets button { padding:5px 8px; font-size:10px; }
 .import-detail-viewport { height:118px; margin-top:8px; overflow:auto; border:1px solid #34433b; border-radius:6px; background-color:#e1e1e1; background-image:linear-gradient(45deg,#c8c8c8 25%,transparent 25%),linear-gradient(-45deg,#c8c8c8 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#c8c8c8 75%),linear-gradient(-45deg,transparent 75%,#c8c8c8 75%); background-size:14px 14px; background-position:0 0,0 7px,7px -7px,-7px 0; }.import-detail-viewport img { display:block; flex:0 0 auto; max-width:none; max-height:none; object-fit:contain; image-rendering:auto; }
 .modal-actions { position:sticky; bottom:-24px; display:flex; justify-content:flex-end; gap:8px; margin:20px -24px -24px; padding:14px 24px 24px; background:linear-gradient(#151b1900,#151b19 35%); }
-.asset-title { display:flex; gap:10px; align-items:center; }
+.asset-title { display:flex; gap:8px; align-items:center; min-width:0; }
 .crop-modal { width:min(680px,100%); }
 .crop-preview { display:block; max-width:100%; height:auto; margin:16px auto; }
 .crop-modal .modal-actions { flex-wrap:wrap; background:#151b19; }
 .sheet-presets button[aria-pressed=true] { border-color:var(--aqua); background:#243b36; }
 .asset-title span { font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.asset-title button { margin-left:auto; background:#32221f; border:0; border-radius:4px; cursor:pointer; }
+.asset-title button { margin-left:0; background:#32221f; border:0; border-radius:7px; cursor:pointer; }
 .asset-title span { min-width:0; flex:1; }
 .asset-title button { flex-shrink:0; min-width:28px; min-height:28px; }
+.asset-title .asset-select { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; overflow-wrap:normal; }
+.asset-title .asset-remove { color:#fff; font-size:20px; line-height:1; }
 .asset-rename { display:flex; gap:6px; align-items:center; flex:1; min-width:0; }
 .asset-rename input { min-width:0; flex:1; }
 .asset-rename .btn, .asset-rename-button { min-height:28px; padding:4px 8px; font-size:12px; }
