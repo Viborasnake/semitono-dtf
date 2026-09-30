@@ -74,10 +74,9 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
     let coverage: number
     if (processingBackground === 'black') {
       coverage = max <= s.tolerance / 255 ? 0 : clamp((max - s.tolerance / 255) / (1 - s.tolerance / 255))
-      // Screening needs unmatted colors to avoid dark dots. Continuous solid
-      // output keeps the source shade: the gray contour pixels are the only
-      // anti-aliasing available when every surviving alpha is opaque.
-      if (max > 0 && !solidBlack) { r /= max; g /= max; b /= max }
+      // Remove the black matte so it cannot become a dark outline on
+      // transparency or a colored garment, including in continuous mode.
+      if (max > 0) { r /= max; g /= max; b /= max }
       if(backgroundCleanup>0 && max>0 && max<48/255){
         // Near-black residues become very bright when divided by their tiny
         // peak channel. Suppress their coverage and limit that gain locally.
