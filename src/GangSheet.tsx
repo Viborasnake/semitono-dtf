@@ -7,7 +7,7 @@ import { inspectPng, withCanvasPrintProfile, resolutionCheck } from './print'
 import type {EditorDocument,GangSource} from './editor-document'
 import {updateGangAsset} from './editor-document'
 import {createHistory,recordHistory,moveHistory,type History} from './history'
-import {Trash2} from 'lucide-react'
+import {ChevronDown,Trash2} from 'lucide-react'
 
 type Asset = {id:string;name:string;img:CanvasImageSource;naturalWidth:number;naturalHeight:number;widthCm:number;heightCm:number;quantity:number;document?:EditorDocument}
 export type ProjectActions={save:()=>void;open:()=>void}
@@ -33,12 +33,27 @@ function savedSheetSettings() {
 export default function GangSheet({source,onImportFile,onEditDocument,previewColor,onPreviewColorChange,getEditor,restoreEditor,initialProject,editorRevision,editorLoading,onSaveStatus,actionsRef}: Props) {
   const [items,setItems] = useState<Asset[]>([])
   const [selectedId,setSelectedId]=useState<string|null>(null)
+  const [renamingId,setRenamingId]=useState<string|null>(null)
+  const [renameValue,setRenameValue]=useState('')
+  const [collapsedAssets,setCollapsedAssets]=useState<Set<string>>(new Set())
   const selectedAsset=items.find(a=>a.id===selectedId)
   function editAsset(id:string){
     setSelectedId(id)
     const item=items.find(a=>a.id===id)
     if(item?.document&&onEditDocument)onEditDocument({...item.document,widthCm:item.widthCm},item.name,item.id)
     else setError('Este diseño no tiene el original editable guardado. Importa el original al editor para evitar volver a tramar un PNG procesado.')
+  }
+  function startRename(item:Asset){
+    setRenamingId(item.id)
+    setRenameValue(item.name)
+  }
+  function finishRename(){
+    if(!renamingId)return
+    const name=renameValue.trim()
+    if(!name)return
+    setItems(all=>all.map(item=>item.id===renamingId?{...item,name}:item))
+    setRenamingId(null)
+    setRenameValue('')
   }
   const [hydrated,setHydrated]=useState(false)
   const initial=useRef(initialProject.sheet)
@@ -256,7 +271,7 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
       <button className="btn" onClick={()=>{importMode.current='raw';input.current?.click()}}>Añadir diseños PNG / imágenes</button>
       <input hidden ref={input} type="file" accept="image/png,image/webp,image/jpeg" multiple onChange={async e=>{const files=Array.from(e.target.files||[]);e.target.value='';if(importMode.current==='adjust' && files[0] && onImportFile){onImportFile(files[0]);return}for(const file of files){try{await add(file,file.name)}catch(err){setError((err as Error).message)}}}}/>
     </div></div>
-    {items.map(item=><div className={`control-card ${selectedId===item.id?'asset-selected':''}`} key={item.id}><div className="section-body"><div className="asset-title"><button className="asset-select" aria-pressed={selectedId===item.id} onClick={()=>setSelectedId(item.id)}>{item.name}</button><button aria-label={`Quitar ${item.name}`} onClick={()=>setItems(all=>all.filter(i=>i.id!==item.id))}>×</button></div><div className="dimension-fields"><label>Ancho (cm)<input type="number" min="0.1" step="0.1" value={Number(item.widthCm.toFixed(2))} onChange={e=>setItems(all=>all.map(i=>i.id===item.id?{...i,widthCm:Number(e.target.value),heightCm:Number(e.target.value)*i.naturalHeight/i.naturalWidth}:i))}/></label><label>Copias<input aria-label={`Copias de ${item.name}`} type="number" min="1" max="200" value={item.quantity} onChange={e=>setItems(all=>all.map(i=>i.id===item.id?{...i,quantity:Number(e.target.value)}:i))}/></label></div><p className="help-text">Alto proporcional: {item.heightCm.toFixed(2)} cm</p>{item.document && onEditDocument ? <button className="btn" onClick={()=>editAsset(item.id)}>Editar original</button> : <p className="help-text">Original no disponible. Importa el original al editor para generar una nueva trama.</p>}</div></div>)}
+    {items.map(item=>{const collapsed=collapsedAssets.has(item.id);return <div className={`control-card ${selectedId===item.id?'asset-selected':''}`} key={item.id}><div className="section-body"><div className="asset-title">{renamingId===item.id ? <form className="asset-rename" onSubmit={e=>{e.preventDefault();finishRename()}}><input autoFocus aria-label="Nuevo nombre del diseño" maxLength={120} value={renameValue} onChange={e=>setRenameValue(e.target.value)} onKeyDown={e=>{if(e.key==='Escape'){setRenamingId(null);setRenameValue('')}}}/><button type="submit" className="btn" disabled={!renameValue.trim()}>Guardar</button><button type="button" className="btn" onClick={()=>{setRenamingId(null);setRenameValue('')}}>Cancelar</button></form> : <><button className="asset-select" aria-pressed={selectedId===item.id} onClick={()=>setSelectedId(item.id)}>{item.name}</button><button type="button" className="btn asset-rename-button" onClick={()=>startRename(item)}>Renombrar</button></>}<button type="button" className="asset-collapse" aria-label={collapsed?`Expandir ${item.name}`:`Colapsar ${item.name}`} aria-expanded={!collapsed} title={collapsed?'Expandir diseño':'Colapsar diseño'} onClick={()=>setCollapsedAssets(all=>{const next=new Set(all);if(next.has(item.id))next.delete(item.id);else next.add(item.id);return next})}><ChevronDown size={18} aria-hidden="true" /></button><button aria-label={`Quitar ${item.name}`} onClick={()=>setItems(all=>all.filter(i=>i.id!==item.id))}>×</button></div>{!collapsed&&<><div className="dimension-fields"><label>Ancho (cm)<input type="number" min="0.1" step="0.1" value={Number(item.widthCm.toFixed(2))} onChange={e=>setItems(all=>all.map(i=>i.id===item.id?{...i,widthCm:Number(e.target.value),heightCm:Number(e.target.value)*i.naturalHeight/i.naturalWidth}:i))}/></label><label>Copias<input aria-label={`Copias de ${item.name}`} type="number" min="1" max="200" value={item.quantity} onChange={e=>setItems(all=>all.map(i=>i.id===item.id?{...i,quantity:Number(e.target.value)}:i))}/></label></div><p className="help-text">Alto proporcional: {item.heightCm.toFixed(2)} cm</p>{item.document && onEditDocument ? <button className="btn" onClick={()=>editAsset(item.id)}>Editar original</button> : <p className="help-text">Original no disponible. Importa el original al editor para generar una nueva trama.</p>}</>}</div></div>})}
     {layoutError && <p role="alert" className="error-text">{layoutError}</p>}
     {tooBig && <p role="alert" className="error-text">Máximo 100 megapíxeles y 16.000 px por lado. Reduce la plancha o los ppp.</p>}
     {layout.missing>0 && <p role="alert" className="error-text">{layout.missing} copias no caben. Amplía la plancha o reduce copias/tamaños para exportar todo.</p>}

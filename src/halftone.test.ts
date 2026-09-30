@@ -209,6 +209,12 @@ test('continuous solid alpha removes weak matte residue instead of promoting it 
  assert.equal(out[3],0)
  assert.equal(out[7],255)
 })
+test('continuous solid alpha keeps faint anti-aliased edge pixels after black removal',()=>{
+ const data=image(255,255,255)
+ data.set([60,60,60,255],0)
+ const out=halftone(data,2,1,{...settings,enabled:false,background:'black',solidAlpha:true}).data
+ assert.equal(out[3],255)
+})
 test('rounded corners retain quarter-circle interior instead of cutting squares',()=>{
  const result=halftone(image(255,255,255),64,64,{...settings,enabled:false,dpi:254,cornerRadiusMm:1})
  const alpha=(x:number,y:number)=>result.data[(y*64+x)*4+3]
