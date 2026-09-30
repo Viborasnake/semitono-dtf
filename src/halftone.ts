@@ -77,6 +77,13 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
       // Remove the black matte so it cannot become a dark outline on
       // transparency or a colored garment, including in continuous mode.
       if (max > 0) { r /= max; g /= max; b /= max }
+      // Black-matted anti-aliasing can carry tiny channel differences that
+      // become vivid cyan/magenta speckles after unmatting. Neutralize only
+      // near-gray source pixels; saturated artwork keeps its original color.
+      if (max > 0 && max - min <= 20 / 255) {
+        const neutral = (r + g + b) / 3
+        r = neutral; g = neutral; b = neutral
+      }
       if(backgroundCleanup>0 && max>0 && max<48/255){
         // Near-black residues become very bright when divided by their tiny
         // peak channel. Suppress their coverage and limit that gain locally.

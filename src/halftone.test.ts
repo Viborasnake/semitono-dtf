@@ -239,6 +239,12 @@ test('continuous solid black removal does not bake a dark matte into opaque edge
   255,64,32,255,
  ])
 })
+test('black removal neutralizes chromatic fringes on near-gray anti-aliasing',()=>{
+ const data=new Uint8ClampedArray([12,8,14,255, 220,100,80,255])
+ const out=halftone(data,2,1,{...settings,enabled:false,background:'black',solidAlpha:true,tolerance:0}).data
+ assert.equal(out[0],out[1]);assert.equal(out[1],out[2])
+ assert.ok(out[4]!==out[5]||out[5]!==out[6])
+})
 test('rounded corners retain quarter-circle interior instead of cutting squares',()=>{
  const result=halftone(image(255,255,255),64,64,{...settings,enabled:false,dpi:254,cornerRadiusMm:1})
  const alpha=(x:number,y:number)=>result.data[(y*64+x)*4+3]
