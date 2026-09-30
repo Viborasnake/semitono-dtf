@@ -224,6 +224,21 @@ test('continuous solid alpha removes isolated dark speckles but keeps connected 
  assert.equal(out[7],255)
  assert.equal(out[11],255)
 })
+test('continuous solid black removal keeps contour shades with opaque alpha',()=>{
+ const data=new Uint8ClampedArray([
+  0,0,0,255,
+  60,60,60,255,
+  255,255,255,255,
+  80,20,10,255,
+ ])
+ const out=halftone(data,4,1,{...settings,enabled:false,solidAlpha:true,tolerance:0}).data
+ assert.deepEqual(Array.from(out),[
+  0,0,0,0,
+  60,60,60,255,
+  255,255,255,255,
+  80,20,10,255,
+ ])
+})
 test('rounded corners retain quarter-circle interior instead of cutting squares',()=>{
  const result=halftone(image(255,255,255),64,64,{...settings,enabled:false,dpi:254,cornerRadiusMm:1})
  const alpha=(x:number,y:number)=>result.data[(y*64+x)*4+3]
