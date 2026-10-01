@@ -36,6 +36,7 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
   const [renamingId,setRenamingId]=useState<string|null>(null)
   const [renameValue,setRenameValue]=useState('')
   const [expandedAssets,setExpandedAssets]=useState<Set<string>>(new Set())
+  const [sheetOpen,setSheetOpen]=useState(true)
   const selectedAsset=items.find(a=>a.id===selectedId)
   function editAsset(id:string){
     setSelectedId(id)
@@ -274,7 +275,7 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
 
   return <section className="workspace gang-workspace"><aside className="sidebar">
     <div className="sidebar-title">Gang Sheet <span className="save-indicator" role="status">● {saveState}</span></div>
-    <div className="control-card open"><div className="section-heading">Plancha de impresión</div><div className="section-body">
+    <div className={`control-card ${sheetOpen?'open':''}`}><button type="button" className="section-heading" aria-expanded={sheetOpen} aria-controls="gang-sheet-settings" onClick={()=>setSheetOpen(open=>!open)}><span>Plancha de impresión</span><ChevronDown size={18} aria-hidden="true"/></button><div className="section-body" id="gang-sheet-settings" hidden={!sheetOpen}>
       <label className="field">Nombre del trabajo<input aria-label="Nombre del trabajo" value={projectName} maxLength={80} onChange={e=>setProjectName(e.target.value)}/></label>
       <div className="field"><span>Mis presets de plancha</span>{sheetPresets.length>0&&<div className="sheet-presets">{sheetPresets.map(p=><div className="sheet-preset" key={p.id}><button type="button" aria-pressed={width===p.width&&height===p.height} onClick={()=>{setWidth(p.width);setHeight(p.height)}}>{p.name}<small>{p.width} × {p.height} cm</small></button><button type="button" className="sheet-preset-delete" aria-label={`Eliminar preset ${p.name}`} title="Eliminar preset" onClick={()=>deleteSheetPreset(p.id)}><Trash2 size={14}/></button></div>)}</div>}<div className="sheet-preset-save"><input aria-label="Nombre del preset de plancha" placeholder="Nombre del preset" value={sheetPresetName} onChange={e=>setSheetPresetName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();saveSheetPreset()}}}/><button type="button" className="btn" disabled={!sheetPresetName.trim()} onClick={saveSheetPreset}>Guardar</button></div></div>
       <div className="dimension-fields"><label>Ancho (cm)<input type="number" aria-label="Ancho de plancha" min="1" value={width} onChange={e=>setWidth(Number(e.target.value))}/></label><label>Alto (cm)<input type="number" aria-label="Alto de plancha" min="1" value={height} onChange={e=>setHeight(Number(e.target.value))}/></label></div>
