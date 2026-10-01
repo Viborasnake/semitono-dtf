@@ -106,6 +106,7 @@ export default function GangPreview({width,height,dpi,background,placements,item
         <span>{(scale*100).toFixed(1)}%</span>
         <button aria-label="Acercar Gang Sheet" onClick={()=>changeZoom(scale*1.25)}><Plus size={14}/></button>
         <button className="zoom-text" aria-pressed={zoom===null} onClick={()=>changeZoom(null)}>Ajustar</button>
+        <button className="zoom-text" aria-pressed={zoom===1} aria-label="Zoom al 100 por ciento" onClick={()=>changeZoom(1)}>100%</button>
         <button className="zoom-text" aria-pressed={zoom===realSizeScale} aria-label={`Tamaño real: ${Math.round(realSizeScale*100)}%`} title={`Tamaño real aproximado a ${dpi} ppp`} onClick={()=>changeZoom(realSizeScale)}>Tamaño real</button>
       </div>
       <div className="gang-format">{status || `PNG · ${background==='checker'?'Fondo transparente':`Vista sobre ${background}`}`}</div>
