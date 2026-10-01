@@ -203,7 +203,12 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [previewBg, setPreviewBg] = useState('checker')
   const [error, setError] = useState('')
   const loadId = useRef(0)
-  const [collapsedPanels, setCollapsedPanels] = useState({presets:true, size:true, background:true, trama:true, ajustes:true, edges:true})
+  const [collapsedPanels, setCollapsedPanels] = useState({presets:false, size:true, background:true, trama:true, ajustes:true, edges:true})
+  type PanelKey = keyof typeof collapsedPanels
+  const togglePanel = (panel:PanelKey) => setCollapsedPanels(current => {
+    if (current[panel]) return {presets:true,size:true,background:true,trama:true,ajustes:true,edges:true,[panel]:false}
+    return {presets:true,size:true,background:true,trama:true,ajustes:true,edges:true}
+  })
   const openWorkflowPanel = (panel:'size'|'trama') => setCollapsedPanels({presets:true, size:true, background:true, trama:true, ajustes:true, edges:true, [panel]:false})
   const [displaySize,setDisplaySize]=useState<{width:number;height:number}|null>(null)
   type Snapshot = {settings:Settings;widthCm:string;dpi:number;crop:CropRect|null;dimensions:{width:number;height:number};garment:GarmentTone}
@@ -733,7 +738,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           <div className="sidebar-title"><div><Sparkles size={18} /><span>Pre-prensa</span></div><div className="sidebar-title-actions"><button type="button" className="sidebar-collapse-toggle" aria-label="Ocultar controles de Pre-prensa" title="Ocultar controles" onClick={()=>setPrepressCollapsed(true)}><ChevronLeft size={17}/></button><button type="button" aria-label="Información" aria-expanded={showInfo} onClick={() => setShowInfo(v => !v)}><Info size={17} /></button></div></div>
           {showInfo && <div className="tip-card"><p>1. Carga tu imagen y define tamaño y ppp. 2. Elige el fondo a eliminar, preset y bordes. 3. Revisa al 100% y sobre la prenda. 4. Exporta PNG o añade a una plancha. El tamaño se graba en el PNG; comprueba que tu RIP respete los centímetros indicados.</p></div>}
 
-          <section className={`control-card ${collapsedPanels.presets ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.presets} aria-controls="preset-controls" onClick={()=>setCollapsedPanels(s=>({...s,presets:!s.presets}))}><span>Presets</span><ChevronDown size={17}/></button><div className="section-body" id="preset-controls" hidden={collapsedPanels.presets}>
+          <section className={`control-card ${collapsedPanels.presets ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.presets} aria-controls="preset-controls" onClick={()=>togglePanel('presets')}><span>Presets</span><ChevronDown size={17}/></button><div className="section-body" id="preset-controls" hidden={collapsedPanels.presets}>
             <div className="preset-group"><span className="preset-group-label">Prenda</span><div className="segmented preset-segments" role="group" aria-label="Tono de prenda">{([['dark','Prenda oscura'],['light','Prenda clara']] as const).map(([tone,label])=><button key={tone} type="button" className={activeGarment===tone?'active':''} aria-pressed={activeGarment===tone} onClick={()=>{if(activeGarment!==tone)choosePresetGroup(tone,presetMode)}}>{label}</button>)}</div></div>
             <div className="preset-group"><span className="preset-group-label">Acabado</span><div className="segmented preset-segments" role="group" aria-label="Acabado">{([['halftone','Semitono'],['continuous','Sin semitono']] as const).map(([mode,label])=><button key={mode} type="button" className={presetMode===mode?'active':''} aria-pressed={presetMode===mode} onClick={()=>{if(presetMode!==mode)choosePresetGroup(activeGarment,mode)}}>{label}</button>)}</div></div>
             <label className="field">Preset<select aria-label="Preset" value={preset.startsWith('saved:')||visiblePresets.some(([key])=>key===preset)?preset:'custom'} onChange={e => {
@@ -752,7 +757,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             {presetMessage && <p className="help-text" role="status">{presetMessage}</p>}
           </div></section>
 
-          <section className={`control-card ${collapsedPanels.size ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.size} aria-controls="size-controls" onClick={()=>setCollapsedPanels(s=>({...s,size:!s.size}))}><span>Tamaño de impresión</span><ChevronDown size={17}/></button><div className="section-body" id="size-controls" hidden={collapsedPanels.size}>
+          <section className={`control-card ${collapsedPanels.size ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.size} aria-controls="size-controls" onClick={()=>togglePanel('size')}><span>Tamaño de impresión</span><ChevronDown size={17}/></button><div className="section-body" id="size-controls" hidden={collapsedPanels.size}>
             <button className="btn" disabled={loading} onClick={()=>setShowCrop(true)}>Recortar imagen (Crop)</button>
             <button className="btn" disabled={loading||!fileName||!output} onClick={trimToContent}>Recortar al contenido</button>
             <p className="help-text">Quita márgenes transparentes del original, sin ampliar el diseño. Conserva los huecos internos. Puedes deshacer el recorte.</p>{cropMessage&&<p className="help-text" role="status">{cropMessage}</p>}
@@ -779,7 +784,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             {sizeError && <p className="error-text" role="alert">{sizeError}</p>}
           </div></section>
 
-          <section className={`control-card ${collapsedPanels.background ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.background} aria-controls="background-controls" onClick={()=>setCollapsedPanels(s=>({...s,background:!s.background}))}><span>Eliminar fondo</span><ChevronDown size={17}/></button><div className="section-body" id="background-controls" hidden={collapsedPanels.background}>
+          <section className={`control-card ${collapsedPanels.background ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.background} aria-controls="background-controls" onClick={()=>togglePanel('background')}><span>Eliminar fondo</span><ChevronDown size={17}/></button><div className="section-body" id="background-controls" hidden={collapsedPanels.background}>
             <div className="segmented"><button className={settings.background === 'black' ? 'active' : ''} onClick={() => update('background', 'black')}>Negro</button><button className={settings.background === 'white' ? 'active' : ''} onClick={() => update('background', 'white')}>Blanco</button><button className={settings.background === 'none' ? 'active' : ''} onClick={() => update('background', 'none')}>Ninguno</button></div>
             {!settings.enabled && settings.background !== 'none' && <><div className="row-label"><span>Alfa sólido (DTF)</span><Toggle checked={settings.solidAlpha} onChange={v => update('solidAlpha', v)} /></div><p className="help-text">Activo: todo píxel visible se exporta opaco (alfa 255); solo el fondo eliminado queda transparente. Recomendado para diseños vectoriales sin semitono.</p></>}
             <button className={`btn color-range-trigger ${settings.background==='custom'?'active':''}`} disabled={!fileName||loading} onClick={()=>setShowColorRange(true)}><Pipette size={16}/><span>{settings.background==='custom'?'Editar rango de color…':'Gotero · Rango de color…'}</span></button>
@@ -793,7 +798,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           </div></section>
 
           <section hidden={!settings.enabled} className={`control-card ${collapsedPanels.trama ? '' : 'open'}`}>
-            <button className="section-heading" aria-expanded={!collapsedPanels.trama} aria-controls="trama-controls" onClick={() => setCollapsedPanels(s=>({...s,trama:!s.trama}))}><span><CircleDot size={17} /> Semitono</span><ChevronDown size={17} /></button>
+            <button className="section-heading" aria-expanded={!collapsedPanels.trama} aria-controls="trama-controls" onClick={() => togglePanel('trama')}><span><CircleDot size={17} /> Semitono</span><ChevronDown size={17} /></button>
             <div className="section-body" id="trama-controls" hidden={collapsedPanels.trama}>
               <RangeControl label="Frecuencia" value={settings.lpi} min={12} max={65} unit=" LPI" onChange={(v) => update('lpi', v)} />
               <RangeControl label="Ángulo" value={settings.angle} min={0} max={90} step={0.5} unit="°" onChange={(v) => update('angle', v)} />
@@ -812,7 +817,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           </section>
 
           <section className={`control-card ${collapsedPanels.ajustes ? '' : 'open'}`}>
-            <button className="section-heading" aria-expanded={!collapsedPanels.ajustes} aria-controls="image-controls" onClick={() => setCollapsedPanels(s=>({...s,ajustes:!s.ajustes}))}><span><SlidersHorizontal size={17} /> Ajustes de imagen</span><ChevronDown size={17} /></button>
+            <button className="section-heading" aria-expanded={!collapsedPanels.ajustes} aria-controls="image-controls" onClick={() => togglePanel('ajustes')}><span><SlidersHorizontal size={17} /> Ajustes de imagen</span><ChevronDown size={17} /></button>
             <div className="section-body" id="image-controls" hidden={collapsedPanels.ajustes}>
               <div className="auto-adjustments">
                 <span className="field">Correcciones automáticas</span>
@@ -832,7 +837,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             </div>
           </section>
 
-          <section className={`control-card ${collapsedPanels.edges ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.edges} aria-controls="edge-controls" onClick={()=>setCollapsedPanels(s=>({...s,edges:!s.edges}))}><span>Suavizar bordes</span><ChevronDown size={17}/></button><div className="section-body" id="edge-controls" hidden={collapsedPanels.edges}>
+          <section className={`control-card ${collapsedPanels.edges ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.edges} aria-controls="edge-controls" onClick={()=>togglePanel('edges')}><span>Suavizar bordes</span><ChevronDown size={17}/></button><div className="section-body" id="edge-controls" hidden={collapsedPanels.edges}>
             <button className="text-button" onClick={() => setSettings(s => ({...s, featherMm: 0, trimMm: 0, cornerRadiusMm: 0, edgeSides: [true,true,true,true]}))}>Reiniciar bordes</button>
             <RangeControl label="Borrar margen" value={settings.trimMm} min={0} max={15} step={0.5} unit=" mm" onChange={v => update('trimMm', v)} />
             <RangeControl label="Desvanecido hacia dentro" value={settings.featherMm} min={0} max={30} step={0.5} unit=" mm" onChange={v => update('featherMm', v)} />
