@@ -139,7 +139,7 @@ input[type='range']::-webkit-slider-thumb { width: 13px; height: 13px; appearanc
   .workspace.workflow-layout-2 > .sidebar { grid-template-columns:repeat(5,minmax(0,1fr)); }
   .workspace.workflow-layout-2 > .sidebar > .control-card { margin:0; }
   .workspace.workflow-layout-2 > .sidebar > .control-card { order:1; }
-  .workspace.workflow-layout-2 > .sidebar > .control-card.open { grid-column:1/-1; order:2; }
+  .workspace.workflow-layout-2 > .sidebar > .control-card.open { grid-column:auto; order:1; }
   .workspace.workflow-layout-2 > .sidebar > .control-card > .section-heading { min-height:58px; padding-left:7px; padding-right:7px; font-size:10px; line-height:1.15; }
   .workspace.workflow-layout-2 > .sidebar > .control-card > .section-heading > span { white-space:normal; }
   .workspace.workflow-layout-2 > .sidebar > .control-card > .section-heading::before { width:23px; height:23px; flex-basis:23px; margin-right:4px; font-size:10px; }
