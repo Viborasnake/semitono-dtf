@@ -7,7 +7,7 @@ import { inspectPng, withCanvasPrintProfile, resolutionCheck } from './print'
 import type {EditorDocument,GangSource} from './editor-document'
 import {updateGangAsset} from './editor-document'
 import {createHistory,recordHistory,moveHistory,type History} from './history'
-import {ChevronDown,Copy,Trash2} from 'lucide-react'
+import {ChevronDown,Copy,Pencil,Trash2} from 'lucide-react'
 
 type Asset = {id:string;name:string;img:CanvasImageSource;naturalWidth:number;naturalHeight:number;widthCm:number;heightCm:number;quantity:number;document?:EditorDocument}
 export type ProjectActions={save:()=>void;open:()=>void}
@@ -299,9 +299,9 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
             <input autoFocus onFocus={e=>e.currentTarget.select()} aria-label="Nuevo nombre del diseño" maxLength={120} value={renameValue} onChange={e=>setRenameValue(e.target.value)} onKeyDown={e=>{if(e.key==='Escape'){setRenamingId(null);setRenameValue('')}}}/>
             <div className="asset-rename-actions"><button type="submit" className="btn" disabled={!renameValue.trim()}>Guardar</button><button type="button" className="btn" onClick={()=>{setRenamingId(null);setRenameValue('')}}>Cancelar</button></div>
           </form> : <div className="asset-actions">
-            <button type="button" className="btn" onClick={()=>startRename(item)}>Renombrar</button>
-            <button type="button" className="btn" onClick={()=>duplicateAsset(item)}><Copy size={15} aria-hidden="true"/> Duplicar</button>
-            <button type="button" className="btn danger" aria-label={`Quitar ${item.name}`} onClick={()=>setItems(all=>all.filter(i=>i.id!==item.id))}><Trash2 size={15} aria-hidden="true"/> Quitar</button>
+            <button type="button" className="btn" title="Renombrar diseño" onClick={()=>startRename(item)}><Pencil size={14} aria-hidden="true"/><span>Renombrar</span></button>
+            <button type="button" className="btn asset-duplicate" title="Duplicar diseño" onClick={()=>duplicateAsset(item)}><Copy size={14} aria-hidden="true"/><span>Duplicar</span></button>
+            <button type="button" className="btn danger" aria-label={`Quitar ${item.name}`} title="Quitar diseño" onClick={()=>setItems(all=>all.filter(i=>i.id!==item.id))}><Trash2 size={14} aria-hidden="true"/><span>Quitar</span></button>
           </div>}
           <div className="dimension-fields"><label>Ancho (cm)<input type="number" min="0.1" step="0.1" value={Number(item.widthCm.toFixed(2))} onChange={e=>setItems(all=>all.map(i=>i.id===item.id?{...i,widthCm:Number(e.target.value),heightCm:Number(e.target.value)*i.naturalHeight/i.naturalWidth}:i))}/></label><label>Copias<input aria-label={`Copias de ${item.name}`} type="number" min="1" max="200" value={item.quantity} onChange={e=>setItems(all=>all.map(i=>i.id===item.id?{...i,quantity:Number(e.target.value)}:i))}/></label></div>
           <p className="help-text">Alto proporcional: {item.heightCm.toFixed(2)} cm</p>
