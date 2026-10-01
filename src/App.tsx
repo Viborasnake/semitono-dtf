@@ -184,6 +184,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [editingAssetId,setEditingAssetId]=useState<string>()
   const [split, setSplit] = useState(52)
   const [fileName, setFileName] = useState('')
+  const [readyForNewImage, setReadyForNewImage] = useState(false)
   const [dimensions, setDimensions] = useState({ width: 1400, height: 1000 })
   const [dragging, setDragging] = useState(false)
   const [widthCm, setWidthCm] = useState('11.8533')
@@ -467,6 +468,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       setWidthCm((physicalWidth ?? img.naturalWidth / sourceDpi * 2.54).toFixed(4))
       setDpi(sourceDpi)
       setFileName(name)
+      setReadyForNewImage(false)
       setWorkflowStep(1)
       setError('')
       setExportMessage('')
@@ -668,7 +670,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     const replaceId=editingAssetId
     setExporting(true)
     resultCanvas.current?.toBlob(async blob => {
-      try {if(!blob)throw new Error('No se pudo generar el diseño.');const tagged=new Blob([withCanvasPrintProfile(new Uint8Array(await blob.arrayBuffer()),sourceDpi)],{type:'image/png'});setGangSource({id: Date.now(), blob:tagged, widthCm: width, name,document:editorDocument,replaceId});setWorkflowStep(3);setTool('gang')}
+      try {if(!blob)throw new Error('No se pudo generar el diseño.');const tagged=new Blob([withCanvasPrintProfile(new Uint8Array(await blob.arrayBuffer()),sourceDpi)],{type:'image/png'});setGangSource({id: Date.now(), blob:tagged, widthCm: width, name,document:editorDocument,replaceId});loadId.current++;processingWorker.current?.terminate();processingWorker.current=null;imageRef.current=null;manualErase.current=null;manualBase.current=null;setImageVersion(v=>v+1);setFileName('');setEditingAssetId(undefined);setCrop(null);setLoading(false);setDisplaySize(null);setReadyKey('');setProcessingProgress(0);setBrushTool(false);setError('');setExportMessage('');setReadyForNewImage(true);setWorkflowStep(3);setTool('gang')}
       catch(e){setError((e as Error).message)}finally{setExporting(false)}
     }, 'image/png')
   }
@@ -878,7 +880,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           </div>}
 
           <div className={`canvas-area ${handActive ? 'hand-active' : ''} ${panning ? 'is-panning' : ''} ${brushTool ? 'brush-active' : ''}`} ref={viewportRef} onPointerDownCapture={startPan} onPointerDown={startBrush} onPointerMove={e=>{movePan(e);moveBrush(e)}} onPointerLeave={()=>setBrushCursor(null)} onPointerUp={e=>{stopPan(e);stopBrush(e)}} onPointerCancel={e=>{stopPan(e);stopBrush(e)}} onLostPointerCapture={e=>{stopPan(e);stopBrush(e)}}>
-            {!fileName && <div className="start-upload"><Upload size={36}/><h2>Arrastra tu imagen aquí</h2><p>PNG, JPG, WebP o SVG</p><button className="btn export" disabled={loading} onClick={()=>fileInput.current?.click()}>{loading?'Abriendo imagen…':'Abrir imagen'}</button>{error && <p className="error-text" role="alert">{error}</p>}</div>}
+            {!fileName && <div className="start-upload"><Upload size={36}/><h2>{readyForNewImage?'Listo para otro diseño':'Arrastra tu imagen aquí'}</h2><p>{readyForNewImage?'Carga una nueva imagen para continuar':'PNG, JPG, WebP o SVG'}</p><button className="btn export" disabled={loading} onClick={()=>fileInput.current?.click()}>{loading?'Abriendo imagen…':readyForNewImage?'Cargar nueva imagen':'Abrir imagen'}</button>{error && <p className="error-text" role="alert">{error}</p>}</div>}
             <div className="artboard" hidden={!fileName} style={{ width: Math.max(1, visibleSize.width * previewScale), height: Math.max(1, visibleSize.height * previewScale), aspectRatio: `${visibleSize.width} / ${visibleSize.height}`, ...(previewBg !== 'checker' ? { backgroundImage: 'none', backgroundColor: previewBg } : {}) }}>
               <canvas ref={sourceCanvas} className="art-canvas" style={{ clipPath: view === 'split' ? `inset(0 ${100 - split}% 0 0)` : 'none', visibility: view === 'result' ? 'hidden' : 'visible' }} />
               <div className="result-layer" style={{ clipPath: view === 'split' ? `inset(0 0 0 ${split}%)` : 'none', visibility: view === 'original' ? 'hidden' : 'visible' }}><canvas ref={resultCanvas} className="art-canvas" /></div>
