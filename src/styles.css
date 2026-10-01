@@ -137,8 +137,8 @@ input[type='range']::-webkit-slider-thumb { width: 13px; height: 13px; appearanc
   .workspace.workflow-layout-1 > .sidebar { display:block; }
   .workspace.workflow-layout-1 > .sidebar > .control-card { margin-bottom:10px; }
   .workspace.workflow-layout-2 { grid-template-columns:296px minmax(0,1fr); }
-  .workspace.workflow-layout-2 > .sidebar { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .workspace.workflow-layout-2 > .sidebar > .control-card { width:100%; min-width:0; margin:0; }
+  .workspace.workflow-layout-2 > .sidebar { display:block; }
+  .workspace.workflow-layout-2 > .sidebar > .control-card { width:100%; min-width:0; margin-bottom:10px; }
   .workspace.workflow-layout-2 > .sidebar > .control-card > .section-heading,
   .workspace.workflow-layout-2 > .sidebar > .control-card > .section-body { width:100%; min-width:0; }
   .workspace.workflow-layout-2 > .sidebar > .control-card { order:1; }
