@@ -2,6 +2,7 @@ import { halftone } from './halftone'
 import { resizeRgba, sharpenRgba } from './resample'
 import { autoAdjust } from './auto-adjust'
 import { neuralUpscaleRgba } from './neural-upscale'
+import { removeSmallParticles, removeTinyDots, smoothRgba } from './refine'
 
 self.onmessage = async (event) => {
   try {
@@ -30,7 +31,11 @@ self.onmessage = async (event) => {
       resized = sharpenRgba(neural ? resizeRgba(neural, neuralWidth, neuralHeight, width, height, 'lanczos3') : resizeRgba(data, sourceWidth, sourceHeight, width, height, 'lanczos3'), width, height, settings.sharpness)
     }
     progress(76)
-    const result = halftone(autoAdjust(resized, settings), width, height, settings, resized)
+    const softened = smoothRgba(resized, width, height, settings.preSmooth ?? 0)
+    const result = halftone(autoAdjust(softened, settings), width, height, settings, softened)
+    removeTinyDots(result.data, width, height, settings.minDotSize ?? 0)
+    removeSmallParticles(result.data, width, height, settings.particleMinSize ?? 0)
+    result.transparent = Math.round(result.data.reduce((count: number, _, index: number) => index % 4 === 3 && result.data[index] === 0 ? count + 1 : count, 0) / (width * height) * 100)
     progress(96)
     self.postMessage({...result, original: resized, warning}, { transfer: [result.data.buffer, resized.buffer] })
   } catch (error) {

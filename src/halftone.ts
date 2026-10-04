@@ -13,6 +13,8 @@ export type HalftoneSettings = {
   whiteRemoval?: 'all' | 'connected'
   whiteDetail?: number
   backgroundCleanup?: number
+  particleMinSize?: number
+  minDotSize?: number
 }
 
 // Clustered ordered screening: retain the source detail inside each dot.

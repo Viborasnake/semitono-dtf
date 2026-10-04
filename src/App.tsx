@@ -54,6 +54,9 @@ export type Settings = {
   tint: number
   autoColorStrength: number
   resampleMethod: ResizeMethod
+  preSmooth: number
+  particleMinSize: number
+  minDotSize: number
 }
 
 const defaults: Settings = {
@@ -88,6 +91,9 @@ const defaults: Settings = {
   tint: 0,
   autoColorStrength: 100,
   resampleMethod: 'lanczos3',
+  preSmooth: 0,
+  particleMinSize: 0,
+  minDotSize: 0,
 }
 
 const initialSettings:Settings = {...defaults,...presets.default.values}
@@ -104,7 +110,7 @@ function readSavedPresets(): SavedPreset[] {
       if (!p || typeof p.id !== 'string' || !p.id.startsWith('saved:') || typeof p.name !== 'string' || !p.name.trim() || !p.settings) return false
       const s = p.settings
       if(p.garment!==undefined&&!['dark','light'].includes(p.garment))return false
-      const ranges = {lpi:[12,65],angle:[0,90],size:[45,125],contrast:[50,180],brightness:[60,140],whiteCutoff:[170,255],tolerance:[0,100],featherMm:[0,30],trimMm:[0,15],cornerRadiusMm:[0,50],sharpness:[0,100],gamma:[.5,2],temperature:[-100,100],tint:[-100,100],autoColorStrength:[0,100],autoToneStrength:[0,100],autoContrastStrength:[0,100]}
+      const ranges = {lpi:[12,65],angle:[0,90],size:[45,125],contrast:[50,180],brightness:[60,140],whiteCutoff:[170,255],tolerance:[0,100],featherMm:[0,30],trimMm:[0,15],cornerRadiusMm:[0,50],sharpness:[0,100],gamma:[.5,2],temperature:[-100,100],tint:[-100,100],autoColorStrength:[0,100],autoToneStrength:[0,100],autoContrastStrength:[0,100],preSmooth:[0,2],particleMinSize:[0,12],minDotSize:[0,2]}
       return Object.entries(ranges).every(([key,[min,max]]) => Number.isFinite(s[key]) && s[key] >= min && s[key] <= max)
         && ['circle','square','line'].includes(s.shape) && ['black','white','none','custom'].includes(s.background)
         && (s.colorRange===undefined||validColorRange(s.colorRange))
@@ -169,7 +175,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const handActive = handTool || spaceHeld
   const [viewport, setViewport] = useState({width: 600, height: 600})
   const [tool, setTool] = useState<'design' | 'gang'>('design')
-  const [workflowStep, setWorkflowStep] = useState<1 | 2 | 3>(1)
+  const [workflowStep, setWorkflowStep] = useState<1 | 2 | 3 | 4>(1)
   const [preset, setPreset] = useState('default')
   const [savedPresets, setSavedPresets] = useState<SavedPreset[]>(readSavedPresets)
   const [savingPreset, setSavingPreset] = useState(false)
@@ -203,13 +209,13 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [previewBg, setPreviewBg] = useState('checker')
   const [error, setError] = useState('')
   const loadId = useRef(0)
-  const [collapsedPanels, setCollapsedPanels] = useState({presets:false, size:true, background:true, trama:true, ajustes:true, edges:true})
+  const [collapsedPanels, setCollapsedPanels] = useState({presets:false, size:true, background:true, trama:true, refinamiento:false, ajustes:true, edges:true})
   type PanelKey = keyof typeof collapsedPanels
   const togglePanel = (panel:PanelKey) => setCollapsedPanels(current => {
-    if (current[panel]) return {presets:true,size:true,background:true,trama:true,ajustes:true,edges:true,[panel]:false}
-    return {presets:true,size:true,background:true,trama:true,ajustes:true,edges:true}
+    if (current[panel]) return {presets:true,size:true,background:true,trama:true,refinamiento:true,ajustes:true,edges:true,[panel]:false}
+    return {presets:true,size:true,background:true,trama:true,refinamiento:true,ajustes:true,edges:true}
   })
-  const openWorkflowPanel = (panel:'size'|'trama') => setCollapsedPanels({presets:true, size:true, background:true, trama:true, ajustes:true, edges:true, [panel]:false})
+  const openWorkflowPanel = (panel:'size'|'trama'|'refinamiento') => setCollapsedPanels({presets:true, size:true, background:true, trama:true, refinamiento:true, ajustes:true, edges:true, [panel]:false})
   const [displaySize,setDisplaySize]=useState<{width:number;height:number}|null>(null)
   type Snapshot = {settings:Settings;widthCm:string;dpi:number;crop:CropRect|null;dimensions:{width:number;height:number};garment:GarmentTone}
   const history=useRef<History<Snapshot>|null>(null)
@@ -675,7 +681,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     const replaceId=editingAssetId
     setExporting(true)
     resultCanvas.current?.toBlob(async blob => {
-      try {if(!blob)throw new Error('No se pudo generar el diseño.');const tagged=new Blob([withCanvasPrintProfile(new Uint8Array(await blob.arrayBuffer()),sourceDpi)],{type:'image/png'});setGangSource({id: Date.now(), blob:tagged, widthCm: width, name,document:editorDocument,replaceId});loadId.current++;processingWorker.current?.terminate();processingWorker.current=null;imageRef.current=null;manualErase.current=null;manualBase.current=null;setImageVersion(v=>v+1);setFileName('');setEditingAssetId(undefined);setCrop(null);setLoading(false);setDisplaySize(null);setReadyKey('');setProcessingProgress(0);setBrushTool(false);setError('');setExportMessage('');setReadyForNewImage(true);setWorkflowStep(3);setTool('gang')}
+      try {if(!blob)throw new Error('No se pudo generar el diseño.');const tagged=new Blob([withCanvasPrintProfile(new Uint8Array(await blob.arrayBuffer()),sourceDpi)],{type:'image/png'});setGangSource({id: Date.now(), blob:tagged, widthCm: width, name,document:editorDocument,replaceId});loadId.current++;processingWorker.current?.terminate();processingWorker.current=null;imageRef.current=null;manualErase.current=null;manualBase.current=null;setImageVersion(v=>v+1);setFileName('');setEditingAssetId(undefined);setCrop(null);setLoading(false);setDisplaySize(null);setReadyKey('');setProcessingProgress(0);setBrushTool(false);setError('');setExportMessage('');setReadyForNewImage(true);setWorkflowStep(4);setTool('gang')}
       catch(e){setError((e as Error).message)}finally{setExporting(false)}
     }, 'image/png')
   }
@@ -729,7 +735,9 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
         <i className="workflow-connector" aria-hidden="true" />
         <button className={`workflow-step ${workflowStep === 2 ? 'active' : ''}`} aria-current={workflowStep === 2 ? 'step' : undefined} onClick={() => { setWorkflowStep(2); setTool('design'); openWorkflowPanel('trama') }}><b>2</b><span>Semitono</span></button>
         <i className="workflow-connector" aria-hidden="true" />
-        <button className={`workflow-step ${workflowStep === 3 ? 'active' : ''}`} aria-current={workflowStep === 3 ? 'step' : undefined} onClick={() => { setWorkflowStep(3); setTool('gang') }}><b>3</b><span>Gang Sheet</span></button>
+        <button className={`workflow-step ${workflowStep === 3 ? 'active' : ''}`} aria-current={workflowStep === 3 ? 'step' : undefined} onClick={() => { setWorkflowStep(3); setTool('design'); openWorkflowPanel('refinamiento') }}><b>3</b><span>Refinamiento</span></button>
+        <i className="workflow-connector" aria-hidden="true" />
+        <button className={`workflow-step ${workflowStep === 4 ? 'active' : ''}`} aria-current={workflowStep === 4 ? 'step' : undefined} onClick={() => { setWorkflowStep(4); setTool('gang') }}><b>4</b><span>Gang Sheet</span></button>
         <span>Todo se procesa en tu equipo</span>
       </nav>
       <div className="gang-container" style={{display: tool === 'gang' ? 'block' : 'none'}}><GangSheet source={gangSource} onImportFile={requestImport} onEditDocument={editGangDocument} previewColor={previewBg} onPreviewColorChange={setPreviewBg} getEditor={snapshotEditor} restoreEditor={restoreProjectEditor} initialProject={initialProject} editorRevision={JSON.stringify([renderKey,fileName,editingAssetId,activeGarment])} editorLoading={loading} onSaveStatus={setProjectStatus} actionsRef={projectActions}/></div>
@@ -816,6 +824,24 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             </div>
           </section>
 
+          <section className={`control-card ${collapsedPanels.refinamiento ? '' : 'open'}`}>
+            <button className="section-heading" aria-expanded={!collapsedPanels.refinamiento} aria-controls="refinement-controls" onClick={() => togglePanel('refinamiento')}><span><Sparkles size={17} /> Refinamiento</span><ChevronDown size={17} /></button>
+            <div className="section-body" id="refinement-controls" hidden={collapsedPanels.refinamiento}>
+              <RangeControl label="Eliminar partículas pequeñas" value={settings.particleMinSize} min={0} max={12} unit=" px" onChange={v => update('particleMinSize', v)} />
+              <p className="help-text">Elimina islas de tinta conectadas menores al tamaño indicado. 0 px desactiva la limpieza.</p>
+              <RangeControl label="Tamaño mínimo de punto" value={settings.minDotSize} min={0} max={2} step={0.1} unit=" px" onChange={v => update('minDotSize', v)} />
+              <p className="help-text">Descarta puntos con una cobertura menor al mínimo visible. Úsalo con moderación para no perder detalle fino.</p>
+              <RangeControl label="Suavizado previo" value={settings.preSmooth} min={0} max={2} step={1} unit=" px" onChange={v => update('preSmooth', v)} />
+              <p className="help-text">Suaviza el original antes del semitono para reducir ruido y variaciones de antialiasing.</p>
+              <div className="brush-tools">
+                <button type="button" className={`btn ${brushTool ? 'active' : ''}`} onClick={() => {setBrushTool(v => !v);setHandTool(false)}} disabled={!output || processing}>{brushTool ? 'Cerrar pincel' : 'Pincel de limpieza'}</button>
+                {brushTool && <RangeControl label="Tamaño del pincel" value={brushSize} min={4} max={120} unit=" px" onChange={setBrushSize} />}
+                {brushTool && <button type="button" className="text-button" onClick={clearManualBrush}>Restaurar borrado del pincel</button>}
+                {brushTool && <p className="help-text">Retoque puntual sobre el resultado. Arrastra sobre las pintitas o bordes contaminados; la imagen original permanece intacta.</p>}
+              </div>
+            </div>
+          </section>
+
           <section className={`control-card ${collapsedPanels.ajustes ? '' : 'open'}`}>
             <button className="section-heading" aria-expanded={!collapsedPanels.ajustes} aria-controls="image-controls" onClick={() => togglePanel('ajustes')}><span><SlidersHorizontal size={17} /> Ajustes de imagen</span><ChevronDown size={17} /></button>
             <div className="section-body" id="image-controls" hidden={collapsedPanels.ajustes}>
@@ -843,12 +869,6 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <RangeControl label="Desvanecido hacia dentro" value={settings.featherMm} min={0} max={30} step={0.5} unit=" mm" onChange={v => update('featherMm', v)} />
             <RangeControl label="Radio de esquinas" value={settings.cornerRadiusMm} min={0} max={50} step={0.5} unit=" mm" onChange={v => update('cornerRadiusMm', v)} />
             <div className="edge-sides">{['Arriba', 'Derecha', 'Abajo', 'Izquierda'].map((label, index) => <label key={label}><input type="checkbox" checked={settings.edgeSides[index]} onChange={e => update('edgeSides', settings.edgeSides.map((v, i) => i === index ? e.target.checked : v))} />{label}</label>)}</div>
-            <div className="brush-tools">
-              <button type="button" className={`btn ${brushTool ? 'active' : ''}`} onClick={() => {setBrushTool(v => !v);setHandTool(false)}} disabled={!output || processing}>{brushTool ? 'Cerrar pincel' : 'Pincel borrar'}</button>
-              {brushTool && <RangeControl label="Tamaño del pincel" value={brushSize} min={4} max={120} unit=" px" onChange={setBrushSize} />}
-              {brushTool && <button type="button" className="text-button" onClick={clearManualBrush}>Restaurar borrado del pincel</button>}
-              {brushTool && <p className="help-text">Arrastra sobre las pintitas o bordes contaminados. Solo se borra el resultado; la imagen original permanece intacta.</p>}
-            </div>
             <p className="help-text">Borra el contorno rectangular, suaviza los lados y permite redondear las cuatro esquinas. El tamaño del lienzo se conserva.</p>
           </div></section>
           <div className="tip-card"><div><Check size={14} /> {processing ? 'ACTUALIZANDO…' : `${transparent}% TRANSPARENTE`}</div><p>{settings.background==='custom'?'Se quitan los colores muestreados en toda la imagen. Puedes revisar o modificar la selección con el gotero.':settings.background === 'black' ? 'El negro lo aporta la prenda. Se eliminan los tonos oscuros del diseño completo.' : settings.background === 'white' ? settings.whiteRemoval==='connected'?'Se quita el fondo claro conectado al borde; se conservan los detalles interiores.':'Se eliminan los blancos del diseño completo.' : settings.enabled?'Se conserva el color y se perfora con la trama.':'Se conserva la imagen sin generar puntos.'} El fondo de vista previa no se exporta.</p></div>
