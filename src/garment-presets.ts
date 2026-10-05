@@ -13,7 +13,7 @@ const neutral:PresetValues = {
   whiteRemoval:'all',whiteDetail:0,backgroundCleanup:0,tolerance:0,enabled:true,sharpness:0,
   gamma:1,autoTone:false,autoContrast:false,autoColor:false,
   autoToneStrength:100,autoContrastStrength:100,autoColorStrength:100,
-  solidAlpha:true,temperature:0,tint:0,resampleMethod:'lanczos3',preSmooth:0,particleMinSize:0,minDotSize:0,protectSolid:false,protectSolidColor:'#ffffff',protectSolidTolerance:10,protectSmoothEdge:true,
+  solidAlpha:true,temperature:0,tint:0,resampleMethod:'lanczos3',preSmooth:0,particleMinSize:0,minDotSize:0,protectSolid:false,protectSolidColor:'#ffffff',protectSolidTolerance:10,protectSmoothEdge:true,flattenColor:false,flattenColorValue:'#ffffff',flattenColorTolerance:12,
 }
 export const garmentPresets:Record<string,GarmentPreset> = {
   default:{garment:'dark',mode:'halftone',label:'Equilibrado',description:'32 LPI, sin enfoque ni correcciones automáticas. El negro lo aporta la prenda.',values:{...neutral}},

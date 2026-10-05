@@ -61,6 +61,9 @@ export type Settings = {
   protectSolidColor: string
   protectSolidTolerance: number
   protectSmoothEdge: boolean
+  flattenColor: boolean
+  flattenColorValue: string
+  flattenColorTolerance: number
 }
 
 const defaults: Settings = {
@@ -102,6 +105,9 @@ const defaults: Settings = {
   protectSolidColor: '#ffffff',
   protectSolidTolerance: 10,
   protectSmoothEdge: true,
+  flattenColor: false,
+  flattenColorValue: '#ffffff',
+  flattenColorTolerance: 12,
 }
 
 const initialSettings:Settings = {...defaults,...presets.default.values}
@@ -118,7 +124,7 @@ function readSavedPresets(): SavedPreset[] {
       if (!p || typeof p.id !== 'string' || !p.id.startsWith('saved:') || typeof p.name !== 'string' || !p.name.trim() || !p.settings) return false
       const s = p.settings
       if(p.garment!==undefined&&!['dark','light'].includes(p.garment))return false
-      const ranges = {lpi:[12,65],angle:[0,90],size:[45,125],contrast:[50,180],brightness:[60,140],whiteCutoff:[170,255],tolerance:[0,100],featherMm:[0,30],trimMm:[0,15],cornerRadiusMm:[0,50],sharpness:[0,100],gamma:[.5,2],temperature:[-100,100],tint:[-100,100],autoColorStrength:[0,100],autoToneStrength:[0,100],autoContrastStrength:[0,100],preSmooth:[0,2],particleMinSize:[0,12],minDotSize:[0,2],protectSolidTolerance:[0,100]}
+      const ranges = {lpi:[12,65],angle:[0,90],size:[45,125],contrast:[50,180],brightness:[60,140],whiteCutoff:[170,255],tolerance:[0,100],featherMm:[0,30],trimMm:[0,15],cornerRadiusMm:[0,50],sharpness:[0,100],gamma:[.5,2],temperature:[-100,100],tint:[-100,100],autoColorStrength:[0,100],autoToneStrength:[0,100],autoContrastStrength:[0,100],preSmooth:[0,2],particleMinSize:[0,12],minDotSize:[0,2],protectSolidTolerance:[0,100],flattenColorTolerance:[0,100]}
       return Object.entries(ranges).every(([key,[min,max]]) => Number.isFinite(s[key]) && s[key] >= min && s[key] <= max)
         && ['circle','square','line'].includes(s.shape) && ['black','white','none','custom'].includes(s.background)
         && (s.colorRange===undefined||validColorRange(s.colorRange))
@@ -129,6 +135,7 @@ function readSavedPresets(): SavedPreset[] {
         && (s.backgroundCleanup===undefined||(Number.isFinite(s.backgroundCleanup)&&s.backgroundCleanup>=0&&s.backgroundCleanup<=100))
         && ['enabled','preserveColor','invert'].every(key => typeof s[key] === 'boolean')
         && typeof s.protectSolid === 'boolean' && typeof s.protectSolidColor === 'string' && /^#[0-9a-f]{6}$/i.test(s.protectSolidColor) && typeof s.protectSmoothEdge === 'boolean'
+        && typeof s.flattenColor === 'boolean' && typeof s.flattenColorValue === 'string' && /^#[0-9a-f]{6}$/i.test(s.flattenColorValue)
         && ['autoTone','autoContrast','autoColor','solidAlpha'].every(key => s[key] === undefined || typeof s[key] === 'boolean')
         && Array.isArray(s.edgeSides) && s.edgeSides.length === 4 && s.edgeSides.every((v:unknown) => typeof v === 'boolean')
     }).map(p=>({...p,settings:{...defaults,...p.settings}}))
@@ -185,7 +192,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const handActive = handTool || spaceHeld
   const [viewport, setViewport] = useState({width: 600, height: 600})
   const [tool, setTool] = useState<'design' | 'gang'>('design')
-  const [workflowStep, setWorkflowStep] = useState<1 | 2 | 3 | 4>(1)
+  const [workflowStep, setWorkflowStep] = useState<1 | 2 | 3 | 4 | 5>(1)
   const [preset, setPreset] = useState('default')
   const [savedPresets, setSavedPresets] = useState<SavedPreset[]>(readSavedPresets)
   const [savingPreset, setSavingPreset] = useState(false)
@@ -219,13 +226,13 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [previewBg, setPreviewBg] = useState('checker')
   const [error, setError] = useState('')
   const loadId = useRef(0)
-  const [collapsedPanels, setCollapsedPanels] = useState({presets:false, size:true, background:true, trama:true, refinamiento:false, ajustes:true, edges:true})
+  const [collapsedPanels, setCollapsedPanels] = useState({presets:false, size:true, retoque:false, background:true, trama:true, refinamiento:false, ajustes:true, edges:true})
   type PanelKey = keyof typeof collapsedPanels
   const togglePanel = (panel:PanelKey) => setCollapsedPanels(current => {
-    if (current[panel]) return {presets:true,size:true,background:true,trama:true,refinamiento:true,ajustes:true,edges:true,[panel]:false}
-    return {presets:true,size:true,background:true,trama:true,refinamiento:true,ajustes:true,edges:true}
+    if (current[panel]) return {presets:true,size:true,retoque:true,background:true,trama:true,refinamiento:true,ajustes:true,edges:true,[panel]:false}
+    return {presets:true,size:true,retoque:true,background:true,trama:true,refinamiento:true,ajustes:true,edges:true}
   })
-  const openWorkflowPanel = (panel:'size'|'trama'|'refinamiento') => setCollapsedPanels({presets:true, size:true, background:true, trama:true, refinamiento:true, ajustes:true, edges:true, [panel]:false})
+  const openWorkflowPanel = (panel:'size'|'retoque'|'trama'|'refinamiento') => setCollapsedPanels({presets:true, size:true, retoque:true, background:true, trama:true, refinamiento:true, ajustes:true, edges:true, [panel]:false})
   const [displaySize,setDisplaySize]=useState<{width:number;height:number}|null>(null)
   type Snapshot = {settings:Settings;widthCm:string;dpi:number;crop:CropRect|null;dimensions:{width:number;height:number};garment:GarmentTone}
   const history=useRef<History<Snapshot>|null>(null)
@@ -691,7 +698,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     const replaceId=editingAssetId
     setExporting(true)
     resultCanvas.current?.toBlob(async blob => {
-      try {if(!blob)throw new Error('No se pudo generar el diseño.');const tagged=new Blob([withCanvasPrintProfile(new Uint8Array(await blob.arrayBuffer()),sourceDpi)],{type:'image/png'});setGangSource({id: Date.now(), blob:tagged, widthCm: width, name,document:editorDocument,replaceId});loadId.current++;processingWorker.current?.terminate();processingWorker.current=null;imageRef.current=null;manualErase.current=null;manualBase.current=null;setImageVersion(v=>v+1);setFileName('');setEditingAssetId(undefined);setCrop(null);setLoading(false);setDisplaySize(null);setReadyKey('');setProcessingProgress(0);setBrushTool(false);setError('');setExportMessage('');setReadyForNewImage(true);setWorkflowStep(4);setTool('gang')}
+      try {if(!blob)throw new Error('No se pudo generar el diseño.');const tagged=new Blob([withCanvasPrintProfile(new Uint8Array(await blob.arrayBuffer()),sourceDpi)],{type:'image/png'});setGangSource({id: Date.now(), blob:tagged, widthCm: width, name,document:editorDocument,replaceId});loadId.current++;processingWorker.current?.terminate();processingWorker.current=null;imageRef.current=null;manualErase.current=null;manualBase.current=null;setImageVersion(v=>v+1);setFileName('');setEditingAssetId(undefined);setCrop(null);setLoading(false);setDisplaySize(null);setReadyKey('');setProcessingProgress(0);setBrushTool(false);setError('');setExportMessage('');setReadyForNewImage(true);setWorkflowStep(5);setTool('gang')}
       catch(e){setError((e as Error).message)}finally{setExporting(false)}
     }, 'image/png')
   }
@@ -743,11 +750,13 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       <nav className="tool-tabs" aria-label="Flujo de trabajo">
         <button className={`workflow-step ${workflowStep === 1 ? 'active' : ''}`} aria-current={workflowStep === 1 ? 'step' : undefined} onClick={() => { setWorkflowStep(1); setTool('design'); openWorkflowPanel('size') }}><b>1</b><span>Tamaño</span></button>
         <i className="workflow-connector" aria-hidden="true" />
-        <button className={`workflow-step ${workflowStep === 2 ? 'active' : ''}`} aria-current={workflowStep === 2 ? 'step' : undefined} onClick={() => { setWorkflowStep(2); setTool('design'); openWorkflowPanel('trama') }}><b>2</b><span>Semitono</span></button>
+        <button className={`workflow-step ${workflowStep === 2 ? 'active' : ''}`} aria-current={workflowStep === 2 ? 'step' : undefined} onClick={() => { setWorkflowStep(2); setTool('design'); openWorkflowPanel('retoque') }}><b>2</b><span>Retoque</span></button>
         <i className="workflow-connector" aria-hidden="true" />
-        <button className={`workflow-step ${workflowStep === 3 ? 'active' : ''}`} aria-current={workflowStep === 3 ? 'step' : undefined} onClick={() => { setWorkflowStep(3); setTool('design'); openWorkflowPanel('refinamiento') }}><b>3</b><span>Refinamiento</span></button>
+        <button className={`workflow-step ${workflowStep === 3 ? 'active' : ''}`} aria-current={workflowStep === 3 ? 'step' : undefined} onClick={() => { setWorkflowStep(3); setTool('design'); openWorkflowPanel('trama') }}><b>3</b><span>Semitono</span></button>
         <i className="workflow-connector" aria-hidden="true" />
-        <button className={`workflow-step ${workflowStep === 4 ? 'active' : ''}`} aria-current={workflowStep === 4 ? 'step' : undefined} onClick={() => { setWorkflowStep(4); setTool('gang') }}><b>4</b><span>Gang Sheet</span></button>
+        <button className={`workflow-step ${workflowStep === 4 ? 'active' : ''}`} aria-current={workflowStep === 4 ? 'step' : undefined} onClick={() => { setWorkflowStep(4); setTool('design'); openWorkflowPanel('refinamiento') }}><b>4</b><span>Refinamiento</span></button>
+        <i className="workflow-connector" aria-hidden="true" />
+        <button className={`workflow-step ${workflowStep === 5 ? 'active' : ''}`} aria-current={workflowStep === 5 ? 'step' : undefined} onClick={() => { setWorkflowStep(5); setTool('gang') }}><b>5</b><span>Gang Sheet</span></button>
         <span>Todo se procesa en tu equipo</span>
       </nav>
       <div className="gang-container" style={{display: tool === 'gang' ? 'block' : 'none'}}><GangSheet source={gangSource} onImportFile={requestImport} onEditDocument={editGangDocument} previewColor={previewBg} onPreviewColorChange={setPreviewBg} getEditor={snapshotEditor} restoreEditor={restoreProjectEditor} initialProject={initialProject} editorRevision={JSON.stringify([renderKey,fileName,editingAssetId,activeGarment])} editorLoading={loading} onSaveStatus={setProjectStatus} actionsRef={projectActions}/></div>
@@ -801,6 +810,17 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <p className="help-text">Se aplica después de ampliar y antes del semitono. Usa valores bajos para fotografías y valores altos solo para gráficos definidos; el alfa se protege para reducir halos.</p>
             {sizeError && <p className="error-text" role="alert">{sizeError}</p>}
           </div></section>
+
+          <section className={`control-card ${collapsedPanels.retoque ? '' : 'open'}`}>
+            <button className="section-heading" aria-expanded={!collapsedPanels.retoque} aria-controls="retouch-controls" onClick={() => togglePanel('retoque')}><span><Pipette size={17} /> Retoque de color</span><ChevronDown size={17} /></button>
+            <div className="section-body" id="retouch-controls" hidden={collapsedPanels.retoque}>
+              <div className="row-label"><span>Aplanar color seleccionado</span><Toggle checked={settings.flattenColor} onChange={v => update('flattenColor', v)} /></div>
+              <label className="color-picker-field"><span>Color aplanado</span><input aria-label="Color aplanado" type="color" value={settings.flattenColorValue} onChange={e => update('flattenColorValue', e.target.value)} /></label>
+              <div className="solid-protection-presets"><button type="button" onClick={() => {update('flattenColorValue','#ffffff');update('flattenColor',true)}}>Aplanar blancos</button><button type="button" onClick={() => {update('flattenColorValue','#000000');update('flattenColor',true)}}>Aplanar negros</button></div>
+              <RangeControl label="Tolerancia de color" value={settings.flattenColorTolerance} min={0} max={40} unit="%" onChange={v => update('flattenColorTolerance', v)} />
+              <p className="help-text">Convierte el color elegido y sus tonos cercanos en un color plano antes del semitono. Conserva el alfa original y no modifica el resto de la imagen.</p>
+            </div>
+          </section>
 
           <section className={`control-card ${collapsedPanels.background ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.background} aria-controls="background-controls" onClick={()=>togglePanel('background')}><span>Eliminar fondo</span><ChevronDown size={17}/></button><div className="section-body" id="background-controls" hidden={collapsedPanels.background}>
             <div className="segmented"><button className={settings.background === 'black' ? 'active' : ''} onClick={() => update('background', 'black')}>Negro</button><button className={settings.background === 'white' ? 'active' : ''} onClick={() => update('background', 'white')}>Blanco</button><button className={settings.background === 'none' ? 'active' : ''} onClick={() => update('background', 'none')}>Ninguno</button></div>

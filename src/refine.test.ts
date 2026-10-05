@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {removeSmallParticles, removeTinyDots, smoothRgba} from './refine.ts'
+import {flattenSelectedColor,removeSmallParticles, removeTinyDots, smoothRgba} from './refine.ts'
 
 test('removes only alpha islands smaller than the configured area', () => {
   const data = new Uint8ClampedArray(5 * 3 * 4)
@@ -23,4 +23,10 @@ test('removes tiny dots but keeps a larger opaque dot', () => {
 test('zero-radius smoothing returns the original buffer', () => {
   const data = new Uint8ClampedArray([1,2,3,255])
   assert.equal(smoothRgba(data,1,1,0),data)
+})
+
+test('flattens only colors inside the selected tolerance and preserves alpha', () => {
+  const data = new Uint8ClampedArray([250,250,250,90, 210,190,180,140])
+  const out = flattenSelectedColor(data, '#ffffff', 12)
+  assert.deepEqual(Array.from(out), [255,255,255,90, 210,190,180,140])
 })

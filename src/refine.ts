@@ -19,6 +19,20 @@ export function smoothRgba(data: Uint8ClampedArray, width: number, height: numbe
   return out
 }
 
+export function flattenSelectedColor(data: Uint8ClampedArray, color: string, tolerance: number) {
+  const match = /^#?([0-9a-f]{6})$/i.exec(color)
+  if (!match) return new Uint8ClampedArray(data)
+  const target = [parseInt(match[1].slice(0, 2), 16), parseInt(match[1].slice(2, 4), 16), parseInt(match[1].slice(4, 6), 16)]
+  const limit = Math.max(0, Math.min(100, tolerance)) / 100 * 441
+  const out = new Uint8ClampedArray(data)
+  for (let i = 0; i < out.length; i += 4) {
+    if (Math.hypot(data[i] - target[0], data[i + 1] - target[1], data[i + 2] - target[2]) <= limit) {
+      out[i] = target[0]; out[i + 1] = target[1]; out[i + 2] = target[2]
+    }
+  }
+  return out
+}
+
 /** Removes connected alpha islands smaller than the requested pixel area. */
 export function removeSmallParticles(data: Uint8ClampedArray, width: number, height: number, minArea: number) {
   const threshold = Math.max(0, Math.floor(minArea))

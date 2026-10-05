@@ -122,8 +122,9 @@ input[type='range']::-webkit-slider-thumb { width: 13px; height: 13px; appearanc
 .workspace:not(.gang-workspace) > .sidebar > .control-card > .section-heading { border-radius:16px 16px 0 0; }
 .workspace:not(.gang-workspace) > .sidebar > .control-card > .section-heading::before { counter-increment: workflow-step; content: counter(workflow-step); width:24px; height:24px; flex:0 0 24px; display:grid; place-items:center; margin-right:8px; border:1px solid #376e62; border-radius:50%; color:var(--aqua); background:#153d37; font-size:11px; font-weight:800; }
 .workflow-step-1 > section:not(:nth-of-type(2)) { display:none; }
-.workflow-step-2 > section:nth-of-type(2) { display:none; }
-.workflow-step-3 > section:not(:nth-of-type(5)) { display:none; }
+.workflow-step-2 > section:not(:nth-of-type(3)):not(:nth-of-type(7)) { display:none; }
+.workflow-step-3 > section:nth-of-type(2), .workflow-step-3 > section:nth-of-type(3), .workflow-step-3 > section:nth-of-type(6) { display:none; }
+.workflow-step-4 > section:not(:nth-of-type(6)) { display:none; }
 .refinement-tabs { display:grid; grid-template-columns:1fr 1fr; gap:6px; padding:3px; border:1px solid #2b3834; border-radius:9px; background:#101815; }
 .refinement-tabs button { border:0; border-radius:6px; padding:8px 6px; color:#87928d; background:transparent; font:inherit; font-size:11px; cursor:pointer; }
 .refinement-tabs button.active { color:var(--aqua); background:#1c3932; }
@@ -157,6 +158,9 @@ input[type='range']::-webkit-slider-thumb { width: 13px; height: 13px; appearanc
   .workspace.workflow-layout-3 { grid-template-columns:296px minmax(0,1fr); }
   .workspace.workflow-layout-3 > .sidebar { display:block; }
   .workspace.workflow-layout-3 > .sidebar > .control-card { width:100%; min-width:0; margin-bottom:10px; }
+  .workspace.workflow-layout-4 { grid-template-columns:296px minmax(0,1fr); }
+  .workspace.workflow-layout-4 > .sidebar { display:block; }
+  .workspace.workflow-layout-4 > .sidebar > .control-card { width:100%; min-width:0; margin-bottom:10px; }
 }
 @media (min-width:900px) and (max-height:850px) {
   .workspace:not(.gang-workspace) > .sidebar { padding-top:12px; padding-bottom:28px; overflow-y:scroll; scrollbar-gutter:stable; }

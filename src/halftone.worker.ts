@@ -2,7 +2,7 @@ import { halftone } from './halftone'
 import { resizeRgba, sharpenRgba } from './resample'
 import { autoAdjust } from './auto-adjust'
 import { neuralUpscaleRgba } from './neural-upscale'
-import { removeSmallParticles, removeTinyDots, smoothRgba } from './refine'
+import { flattenSelectedColor, removeSmallParticles, removeTinyDots, smoothRgba } from './refine'
 
 self.onmessage = async (event) => {
   try {
@@ -31,7 +31,8 @@ self.onmessage = async (event) => {
       resized = sharpenRgba(neural ? resizeRgba(neural, neuralWidth, neuralHeight, width, height, 'lanczos3') : resizeRgba(data, sourceWidth, sourceHeight, width, height, 'lanczos3'), width, height, settings.sharpness)
     }
     progress(76)
-    const softened = smoothRgba(resized, width, height, settings.preSmooth ?? 0)
+    const flattened = settings.flattenColor ? flattenSelectedColor(resized, settings.flattenColorValue, settings.flattenColorTolerance) : resized
+    const softened = smoothRgba(flattened, width, height, settings.preSmooth ?? 0)
     const result = halftone(autoAdjust(softened, settings), width, height, settings, softened, resized)
     for (let p = 0; p < result.protectedMask.length; p++) if (result.protectedMask[p]) {
       const i = p * 4
