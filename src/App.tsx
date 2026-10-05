@@ -188,6 +188,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [brushCursor, setBrushCursor] = useState<{x:number;y:number}|null>(null)
   const manualErase = useRef<{data:Uint8Array;width:number;height:number}|null>(null)
   const colorCorrection = useRef<{data:Uint8Array;width:number;height:number}|null>(null)
+  const colorBrushSample = useRef<[number, number, number] | null>(null)
   const manualBase = useRef<{data:Uint8ClampedArray;width:number;height:number}|null>(null)
   const eraseHistory = useRef<{past:Uint8Array[];future:Uint8Array[]}>({past:[],future:[]})
   const brushing = useRef<number|null>(null)
@@ -400,16 +401,30 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const paintColorAt = (e: ReactPointerEvent<HTMLDivElement>) => {
     const canvas = resultCanvas.current, point = brushPoint(e)
     if (!canvas || !point) return
+    const source = sourceCanvas.current
+    const sample = colorBrushSample.current
     const mask = colorCorrection.current?.width === canvas.width && colorCorrection.current.height === canvas.height ? colorCorrection.current.data : new Uint8Array(canvas.width * canvas.height)
     colorCorrection.current = {data: mask, width: canvas.width, height: canvas.height}
     const radius = Math.max(1, brushSize / 2 * canvas.width / canvas.getBoundingClientRect().width)
     const left = Math.max(0, Math.floor(point.x - radius)), right = Math.min(canvas.width - 1, Math.ceil(point.x + radius))
     const top = Math.max(0, Math.floor(point.y - radius)), bottom = Math.min(canvas.height - 1, Math.ceil(point.y + radius))
-    for (let y = top; y <= bottom; y++) for (let x = left; x <= right; x++) if (Math.hypot(x + .5 - point.x, y + .5 - point.y) <= radius) mask[y * canvas.width + x] = 1
+    const sourcePixels = source?.width === canvas.width && source.height === canvas.height ? source.getContext('2d', {willReadFrequently:true})?.getImageData(left, top, right - left + 1, bottom - top + 1).data : null
+    const colorLimit = Math.max(0, Math.min(100, settings.flattenColorTolerance)) / 100 * 441
+    for (let y = top; y <= bottom; y++) for (let x = left; x <= right; x++) {
+      if (Math.hypot(x + .5 - point.x, y + .5 - point.y) > radius) continue
+      const sourceIndex = ((y - top) * (right - left + 1) + x - left) * 4
+      const matchesSample = !sample || !sourcePixels || Math.hypot(sourcePixels[sourceIndex] - sample[0], sourcePixels[sourceIndex + 1] - sample[1], sourcePixels[sourceIndex + 2] - sample[2]) <= colorLimit
+      if (matchesSample) mask[y * canvas.width + x] = 1
+    }
     setColorCorrectionVersion(v => v + 1)
   }
   const startColorBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!colorBrushTool || brushTool || pickColorTool || e.button !== 0 || view === 'original' || processing || exporting) return
+    const canvas = resultCanvas.current, point = brushPoint(e), source = sourceCanvas.current
+    if (canvas && point && source?.width === canvas.width && source.height === canvas.height) {
+      const pixel = source.getContext('2d', {willReadFrequently:true})!.getImageData(Math.round(point.x), Math.round(point.y), 1, 1).data
+      colorBrushSample.current = [pixel[0], pixel[1], pixel[2]]
+    } else colorBrushSample.current = null
     e.preventDefault(); e.stopPropagation(); colorBrushing.current = e.pointerId
     e.currentTarget.setPointerCapture(e.pointerId); paintColorAt(e)
   }
@@ -417,6 +432,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const stopColorBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (colorBrushing.current !== e.pointerId) return
     colorBrushing.current = null
+    colorBrushSample.current = null
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
   }
   const pickOriginalColor = (e: ReactPointerEvent<HTMLDivElement>) => {

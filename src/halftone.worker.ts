@@ -31,7 +31,7 @@ self.onmessage = async (event) => {
       resized = sharpenRgba(neural ? resizeRgba(neural, neuralWidth, neuralHeight, width, height, 'lanczos3') : resizeRgba(data, sourceWidth, sourceHeight, width, height, 'lanczos3'), width, height, settings.sharpness)
     }
     progress(76)
-    const corrected = event.data.colorCorrection ? applyColorCorrection(resized, event.data.colorCorrection, settings.flattenColorValue, settings.flattenColorTolerance) : resized
+    const corrected = event.data.colorCorrection ? applyColorCorrection(resized, event.data.colorCorrection, settings.flattenColorValue, 100) : resized
     const flattened = settings.flattenColor ? flattenSelectedColor(corrected, settings.flattenColorValue, settings.flattenColorTolerance) : corrected
     const softened = smoothRgba(flattened, width, height, settings.preSmooth ?? 0)
     const result = halftone(autoAdjust(softened, settings), width, height, settings, softened, flattened)
