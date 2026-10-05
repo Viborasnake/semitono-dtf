@@ -242,6 +242,8 @@ input[type=checkbox] { accent-color:var(--aqua); }
 .btn.danger { color:#ffb7a8; border-color:#65423a; }
 .advanced-controls { min-width:0; }
 .advanced-controls summary { cursor:pointer; color:#afc7bc; font-size:11px; padding:8px 0; }
+.advanced-heading { display:flex; align-items:center; justify-content:space-between; gap:10px; color:#afc7bc; font-size:11px; }
+.advanced-heading .text-button { flex:0 0 auto; color:var(--aqua); }
 .advanced-body { display:grid; gap:16px; padding-top:12px; }
 .advanced-reset { width:100%; justify-content:center; }
 .control-card[hidden] { display:none!important; }
