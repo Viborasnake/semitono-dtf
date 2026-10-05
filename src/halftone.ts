@@ -42,6 +42,8 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
   const backgroundCleanup=s.enabled!==false&&s.preserveColor?Math.max(0,Math.min(100,s.backgroundCleanup??0))/100:0
   const protection = s.protectSolid ? parseHexColor(s.protectSolidColor ?? '#ffffff') : null
   const protectionDistance = Math.max(0, Math.min(100, s.protectSolidTolerance ?? 10)) / 100 * 441
+  const protectionNeutral = !!protection && Math.max(...protection) - Math.min(...protection) <= 12
+  const protectionNeutralSpread = Math.max(10, (s.protectSolidTolerance ?? 10) * .3)
   const circleRanks = Float64Array.from({length: 4097}, (_, i) => {
     const d = i / 2048
     return d <= 1 ? Math.PI * d / 4 : Math.PI * d / 4 - d * Math.acos(1 / Math.sqrt(d)) + Math.sqrt(d - 1)
@@ -145,7 +147,8 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
     }
     const removed = coverage === 0 && s.background !== 'none'
     if (removed) { transparent++; continue }
-    const protect = !!protection && colorDistance(protectionSource[i], protectionSource[i+1], protectionSource[i+2], protection[0], protection[1], protection[2]) <= protectionDistance
+    const sourceSpread = Math.max(protectionSource[i], protectionSource[i+1], protectionSource[i+2]) - Math.min(protectionSource[i], protectionSource[i+1], protectionSource[i+2])
+    const protect = !!protection && colorDistance(protectionSource[i], protectionSource[i+1], protectionSource[i+2], protection[0], protection[1], protection[2]) <= protectionDistance && (!protectionNeutral || sourceSpread <= protectionNeutralSpread)
     if (protect) { protectedMask[y * width + x] = 1; continue }
     coverage = clamp((coverage - .5) * s.contrast / 100 + .5 + (s.brightness - 100) / 100)
     if (s.invert) coverage = 1 - coverage

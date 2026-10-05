@@ -42,6 +42,12 @@ test('protected color is selected from the original source and preserves alpha',
   assert.equal(protectedResult.data[3],0)
   assert.equal(halftone(image(255,255,255),64,64,{...s,background:'white'}).protectedMask[0],0)
 })
+test('neutral protection does not capture warm beige pixels at high tolerance', () => {
+  const s={...settings,protectSolid:true,protectSolidColor:'#ffffff',protectSolidTolerance:40}
+  const beige=image(232,216,190)
+  const result=halftone(beige,64,64,s)
+  assert.equal(result.protectedMask[0],0)
+})
 test('white garment preset produces real dots and preserves mean tone on white at each output DPI',()=>{
   const side=256
   const colors=[[128,128,128],[60,45,30],[235,25,15],[245,236,210],[230,145,145]]
