@@ -22,8 +22,8 @@ self.onmessage = async (event) => {
       if (sourceWidth * sourceHeight > 4_000_000) {
         warning = 'La imagen es demasiado grande para Neural; se usó Lanczos-3 para evitar un error de memoria.'
       } else {
-        try { neural = await neuralUpscaleRgba(data, sourceWidth, sourceHeight, neuralScale) }
-        catch { warning = 'Neural no pudo procesar esta imagen; se usó Lanczos-3 como respaldo.' }
+        try { neural = await neuralUpscaleRgba(data, sourceWidth, sourceHeight, neuralScale, fraction => progress(8 + Math.round(54 * fraction))) }
+        catch (error) { warning = `Neural no pudo procesar esta imagen; se usó Lanczos-3 como respaldo.${import.meta.env.DEV && error instanceof Error ? ` ${error.message}` : ''}` }
       }
     }
       progress(neural ? 62 : 42)
