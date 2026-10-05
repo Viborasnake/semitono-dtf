@@ -33,12 +33,13 @@ export function flattenSelectedColor(data: Uint8ClampedArray, color: string, tol
   return out
 }
 
-export function applyColorCorrection(data: Uint8ClampedArray, mask: Uint8Array, color: string) {
+export function applyColorCorrection(data: Uint8ClampedArray, mask: Uint8Array, color: string, tolerance = 0) {
   const match = /^#?([0-9a-f]{6})$/i.exec(color)
   if (!match) return data
   const r = parseInt(match[1].slice(0, 2), 16), g = parseInt(match[1].slice(2, 4), 16), b = parseInt(match[1].slice(4, 6), 16)
+  const limit = Math.max(0, Math.min(100, tolerance)) / 100 * 441
   const out = new Uint8ClampedArray(data)
-  for (let p = 0; p < mask.length; p++) if (mask[p]) {
+  for (let p = 0; p < mask.length; p++) if (mask[p] && Math.hypot(data[p * 4] - r, data[p * 4 + 1] - g, data[p * 4 + 2] - b) <= limit) {
     const i = p * 4
     out[i] = r; out[i + 1] = g; out[i + 2] = b
   }

@@ -33,6 +33,6 @@ test('flattens only colors inside the selected tolerance and preserves alpha', (
 
 test('color correction brush changes only its mask and preserves alpha', () => {
   const data = new Uint8ClampedArray([10,20,30,80, 40,50,60,120])
-  const out = applyColorCorrection(data, new Uint8Array([1,0]), '#ffffff')
+  const out = applyColorCorrection(data, new Uint8Array([1,0]), '#ffffff', 100)
   assert.deepEqual(Array.from(out), [255,255,255,80, 40,50,60,120])
 })

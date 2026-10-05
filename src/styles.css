@@ -133,6 +133,8 @@ input[type='range']::-webkit-slider-thumb { width: 13px; height: 13px; appearanc
 .solid-protection-presets { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
 .solid-protection-presets button { padding:8px 6px; border:1px solid #34453f; border-radius:7px; color:#b9c4bf; background:#17201d; font:inherit; font-size:11px; cursor:pointer; }
 .solid-protection-presets button:hover { border-color:var(--aqua); color:var(--aqua); }
+.color-pick-hint { color:var(--aqua); }
+.color-picker-cursor { border:2px solid var(--aqua); box-shadow:0 0 0 2px #101614, 0 0 8px rgba(41,226,194,.9); }
 .workspace:not(.gang-workspace) > .sidebar > .control-card > .section-heading { justify-content:flex-start; }
 @media (min-width:1200px) {
   .workspace:not(.gang-workspace) { grid-template-columns:520px minmax(0,1fr); }
@@ -377,6 +379,10 @@ input[type=checkbox] { accent-color:var(--aqua); }
 .import-detail { margin:12px 0 4px; padding:10px; border:1px solid #2b4439; border-radius:10px; background:#101613; }.import-detail-head { display:flex; align-items:center; justify-content:space-between; color:#d8e6df; font-size:12px; font-weight:700; }.import-detail-head .scale-presets { margin:0; }.import-detail-head .scale-presets button { padding:5px 8px; font-size:10px; }
 .import-detail-viewport { height:118px; margin-top:8px; overflow:auto; border:1px solid #34433b; border-radius:6px; background-color:#e1e1e1; background-image:linear-gradient(45deg,#c8c8c8 25%,transparent 25%),linear-gradient(-45deg,#c8c8c8 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#c8c8c8 75%),linear-gradient(-45deg,transparent 75%,#c8c8c8 75%); background-size:14px 14px; background-position:0 0,0 7px,7px -7px,-7px 0; }.import-detail-viewport img { display:block; flex:0 0 auto; max-width:none; max-height:none; object-fit:contain; image-rendering:auto; }
 .modal-actions { position:sticky; bottom:-24px; display:flex; justify-content:flex-end; gap:8px; margin:20px -24px -24px; padding:14px 24px 24px; background:linear-gradient(#151b1900,#151b19 35%); }
+.tool-confirm-backdrop { place-items:center; }
+.tool-confirm-modal { width:min(520px,100%); }
+.tool-confirm-modal h2 { line-height:1.25; }
+.tool-confirm-modal .modal-actions { position:static; margin:20px -24px -24px; }
 .crop-modal { width:min(680px,100%); }
 .crop-preview { display:block; max-width:100%; height:auto; margin:16px auto; }
 .crop-modal .modal-actions { flex-wrap:wrap; background:#151b19; }

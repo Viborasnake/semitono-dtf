@@ -19,6 +19,7 @@ import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleDot, Download, Fol
 
 type Shape = 'circle' | 'square' | 'line'
 type ViewMode = 'result' | 'split' | 'original'
+type WorkflowDestination = {step: 1 | 2 | 3 | 4 | 5; panel?: 'size' | 'retoque' | 'trama' | 'refinamiento'; tool: 'design' | 'gang'}
 
 export type Settings = {
   lpi: number
@@ -198,6 +199,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [viewport, setViewport] = useState({width: 600, height: 600})
   const [tool, setTool] = useState<'design' | 'gang'>('design')
   const [workflowStep, setWorkflowStep] = useState<1 | 2 | 3 | 4 | 5>(1)
+  const [pendingWorkflowDestination, setPendingWorkflowDestination] = useState<WorkflowDestination | null>(null)
   const [preset, setPreset] = useState('default')
   const [savedPresets, setSavedPresets] = useState<SavedPreset[]>(readSavedPresets)
   const [savingPreset, setSavingPreset] = useState(false)
@@ -238,6 +240,29 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     return {presets:true,size:true,retoque:true,background:true,trama:true,refinamiento:true,ajustes:true,edges:true}
   })
   const openWorkflowPanel = (panel:'size'|'retoque'|'trama'|'refinamiento') => setCollapsedPanels({presets:true, size:true, retoque:true, background:true, trama:true, refinamiento:true, ajustes:true, edges:true, [panel]:false})
+  const goToWorkflow = (destination: WorkflowDestination) => {
+    if (colorBrushTool && destination.step !== workflowStep) {
+      setPendingWorkflowDestination(destination)
+      return
+    }
+    setWorkflowStep(destination.step)
+    setTool(destination.tool)
+    if (destination.panel) openWorkflowPanel(destination.panel)
+  }
+  const resolveWorkflowExit = (keepChanges: boolean) => {
+    const destination = pendingWorkflowDestination
+    if (!destination) return
+    if (!keepChanges) {
+      colorCorrection.current = null
+      setColorCorrectionVersion(v => v + 1)
+    }
+    setColorBrushTool(false)
+    setPickColorTool(false)
+    setPendingWorkflowDestination(null)
+    setWorkflowStep(destination.step)
+    setTool(destination.tool)
+    if (destination.panel) openWorkflowPanel(destination.panel)
+  }
   const [displaySize,setDisplaySize]=useState<{width:number;height:number}|null>(null)
   type Snapshot = {settings:Settings;widthCm:string;dpi:number;crop:CropRect|null;dimensions:{width:number;height:number};garment:GarmentTone}
   const history=useRef<History<Snapshot>|null>(null)
@@ -799,15 +824,15 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       </div>
 
       <nav className="tool-tabs" aria-label="Flujo de trabajo">
-        <button className={`workflow-step ${workflowStep === 1 ? 'active' : ''}`} aria-current={workflowStep === 1 ? 'step' : undefined} onClick={() => { setWorkflowStep(1); setTool('design'); openWorkflowPanel('size') }}><b>1</b><span>Tamaño</span></button>
+        <button className={`workflow-step ${workflowStep === 1 ? 'active' : ''}`} aria-current={workflowStep === 1 ? 'step' : undefined} onClick={() => goToWorkflow({step:1,tool:'design',panel:'size'})}><b>1</b><span>Tamaño</span></button>
         <i className="workflow-connector" aria-hidden="true" />
-        <button className={`workflow-step ${workflowStep === 2 ? 'active' : ''}`} aria-current={workflowStep === 2 ? 'step' : undefined} onClick={() => { setWorkflowStep(2); setTool('design'); openWorkflowPanel('retoque') }}><b>2</b><span>Retoque</span></button>
+        <button className={`workflow-step ${workflowStep === 2 ? 'active' : ''}`} aria-current={workflowStep === 2 ? 'step' : undefined} onClick={() => goToWorkflow({step:2,tool:'design',panel:'retoque'})}><b>2</b><span>Retoque</span></button>
         <i className="workflow-connector" aria-hidden="true" />
-        <button className={`workflow-step ${workflowStep === 3 ? 'active' : ''}`} aria-current={workflowStep === 3 ? 'step' : undefined} onClick={() => { setWorkflowStep(3); setTool('design'); openWorkflowPanel('trama') }}><b>3</b><span>Semitono</span></button>
+        <button className={`workflow-step ${workflowStep === 3 ? 'active' : ''}`} aria-current={workflowStep === 3 ? 'step' : undefined} onClick={() => goToWorkflow({step:3,tool:'design',panel:'trama'})}><b>3</b><span>Semitono</span></button>
         <i className="workflow-connector" aria-hidden="true" />
-        <button className={`workflow-step ${workflowStep === 4 ? 'active' : ''}`} aria-current={workflowStep === 4 ? 'step' : undefined} onClick={() => { setWorkflowStep(4); setTool('design'); openWorkflowPanel('refinamiento') }}><b>4</b><span>Refinamiento</span></button>
+        <button className={`workflow-step ${workflowStep === 4 ? 'active' : ''}`} aria-current={workflowStep === 4 ? 'step' : undefined} onClick={() => goToWorkflow({step:4,tool:'design',panel:'refinamiento'})}><b>4</b><span>Refinamiento</span></button>
         <i className="workflow-connector" aria-hidden="true" />
-        <button className={`workflow-step ${workflowStep === 5 ? 'active' : ''}`} aria-current={workflowStep === 5 ? 'step' : undefined} onClick={() => { setWorkflowStep(5); setTool('gang') }}><b>5</b><span>Gang Sheet</span></button>
+        <button className={`workflow-step ${workflowStep === 5 ? 'active' : ''}`} aria-current={workflowStep === 5 ? 'step' : undefined} onClick={() => goToWorkflow({step:5,tool:'gang'})}><b>5</b><span>Gang Sheet</span></button>
         <span>Todo se procesa en tu equipo</span>
       </nav>
       <div className="gang-container" style={{display: tool === 'gang' ? 'block' : 'none'}}><GangSheet source={gangSource} onImportFile={requestImport} onEditDocument={editGangDocument} previewColor={previewBg} onPreviewColorChange={setPreviewBg} getEditor={snapshotEditor} restoreEditor={restoreProjectEditor} initialProject={initialProject} editorRevision={JSON.stringify([renderKey,fileName,editingAssetId,activeGarment])} editorLoading={loading} onSaveStatus={setProjectStatus} actionsRef={projectActions}/></div>
@@ -873,6 +898,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               <div className="solid-protection-presets"><button type="button" onClick={() => {update('flattenColorValue','#ffffff');update('flattenColor',true)}}>Aplanar blancos</button><button type="button" onClick={() => {update('flattenColorValue','#000000');update('flattenColor',true)}}>Aplanar negros</button></div>
               <RangeControl label="Tolerancia de color" value={settings.flattenColorTolerance} min={0} max={40} unit="%" onChange={v => update('flattenColorTolerance', v)} />
               <button type="button" className={`btn ${pickColorTool ? 'active' : ''}`} onClick={() => {setPickColorTool(v => !v);setColorBrushTool(false)}} disabled={!fileName || processing}>{pickColorTool ? 'Haz clic en el color original…' : 'Tomar color del original'}</button>
+              {pickColorTool && <p className="help-text color-pick-hint">Selector activo: haz clic sobre el color en la imagen para tomarlo.</p>}
               <button type="button" className={`btn ${colorBrushTool ? 'active' : ''}`} onClick={() => {setColorBrushTool(v => !v);setPickColorTool(false);setBrushTool(false)}} disabled={!output || processing}>{colorBrushTool ? 'Cerrar pincel corrector' : 'Pincel corrector de color'}</button>
               {colorBrushTool && <RangeControl label="Tamaño del pincel" value={brushSize} min={4} max={120} unit=" px" onChange={setBrushSize} />}
               {colorBrushTool && <button type="button" className="text-button" onClick={() => {colorCorrection.current=null;setColorCorrectionVersion(v=>v+1)}}>Restaurar correcciones de color</button>}
@@ -959,6 +985,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               </div>
               {(settings.autoTone||settings.autoContrast)&&<p className="help-text">0% conserva el tono original; 100% aplica toda la corrección automática.</p>}
               <details className="advanced-controls"><summary>Ajustes avanzados de imagen</summary><div className="advanced-body">
+              <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('ajustes')}>Restablecer ajustes avanzados</button>
               <RangeControl label="Contraste" value={settings.contrast} min={50} max={180} unit="%" onChange={(v) => update('contrast', v)} />
               <RangeControl label={settings.background==='white'?'Densidad de tinta':'Brillo'} value={settings.brightness} min={60} max={140} unit="%" onChange={(v) => update('brightness', v)} />
               <RangeControl label="Degradados (gamma)" value={settings.gamma} min={0.5} max={2} step={0.05} onChange={v => update('gamma', v)} />
@@ -1017,7 +1044,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <div className="artboard" hidden={!fileName} style={{ width: Math.max(1, visibleSize.width * previewScale), height: Math.max(1, visibleSize.height * previewScale), aspectRatio: `${visibleSize.width} / ${visibleSize.height}`, ...(previewBg !== 'checker' ? { backgroundImage: 'none', backgroundColor: previewBg } : {}) }}>
               <canvas ref={sourceCanvas} className="art-canvas" style={{ clipPath: view === 'split' ? `inset(0 ${100 - split}% 0 0)` : 'none', visibility: view === 'result' ? 'hidden' : 'visible' }} />
               <div className="result-layer" style={{ clipPath: view === 'split' ? `inset(0 0 0 ${split}%)` : 'none', visibility: view === 'original' ? 'hidden' : 'visible' }}><canvas ref={resultCanvas} className="art-canvas" /></div>
-              {(brushTool || colorBrushTool) && brushCursor && resultCanvas.current && <div className="brush-cursor" style={{left: brushCursor.x, top: brushCursor.y, width: brushSize * resultCanvas.current.getBoundingClientRect().width / resultCanvas.current.width, height: brushSize * resultCanvas.current.getBoundingClientRect().height / resultCanvas.current.height}} aria-hidden="true" />}
+              {(brushTool || colorBrushTool || pickColorTool) && brushCursor && resultCanvas.current && <div className={`brush-cursor ${pickColorTool ? 'color-picker-cursor' : ''}`} style={{left: brushCursor.x, top: brushCursor.y, width: pickColorTool ? 18 : brushSize * resultCanvas.current.getBoundingClientRect().width / resultCanvas.current.width, height: pickColorTool ? 18 : brushSize * resultCanvas.current.getBoundingClientRect().height / resultCanvas.current.height}} aria-hidden="true" />}
               {view === 'split' && !brushTool && <><div className="split-line" style={{ left: `${split}%` }}><span><Minus /><Minus /></span></div><input className="split-input" aria-label="Divisor de comparación" type="range" min="0" max="100" value={split} onChange={(e) => setSplit(Number(e.target.value))} /></>}
             </div>
             {dragging && <div className="drop-overlay"><Upload size={32} /><b>Suelta tu imagen aquí</b><span>PNG, JPG, WebP o SVG</span></div>}
@@ -1030,6 +1057,18 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           </div>
         </section>
       </main>
+      {pendingWorkflowDestination && <div className="modal-backdrop tool-confirm-backdrop" role="presentation">
+        <section className="import-modal tool-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="color-brush-exit-title">
+          <span className="modal-kicker">PINCEL CORRECTOR</span>
+          <h2 id="color-brush-exit-title">¿Deseas salir del pincel corrector sin guardar cambios?</h2>
+          <p className="help-text">Puedes conservar las correcciones aplicadas, eliminarlas antes de cambiar de sección o volver al pincel.</p>
+          <div className="modal-actions">
+            <button type="button" className="btn ghost" onClick={() => setPendingWorkflowDestination(null)}>Volver</button>
+            <button type="button" className="btn ghost" onClick={() => resolveWorkflowExit(false)}>Borrar</button>
+            <button type="button" className="btn export" onClick={() => resolveWorkflowExit(true)}>Guardar cambio</button>
+          </div>
+        </section>
+      </div>}
       {showCrop && imageRef.current && <CropPanel image={imageRef.current} initial={crop ?? {x:0,y:0,width:dimensions.width,height:dimensions.height}} onCancel={()=>setShowCrop(false)} onApply={rect=>{setWidthCm((Number(widthCm)*rect.width/dimensions.width).toFixed(4));setDimensions({width:rect.width,height:rect.height});setCrop(rect);setShowCrop(false);setFit(true)}}/>}
       {showColorRange&&imageRef.current&&<ColorRangePanel image={imageRef.current} crop={crop} initial={settings.colorRange??{...defaultColorRange,colors:[settings.background==='black'?'#000000':'#ffffff']}} onCancel={()=>setShowColorRange(false)} onApply={colorRange=>{const base=settings.background==='black'||settings.background==='white'?settings.background:activeGarment==='dark'?'black':'white';setGarment(activeGarment);setSettings(s=>({...s,background:'custom',customBase:base,colorRange,preserveColor:true}));setPreset('custom');setView('result');setShowColorRange(false)}}/>}
     </div>
