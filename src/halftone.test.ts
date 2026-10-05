@@ -33,6 +33,15 @@ test('white mode removes white and keeps black', () => {
   assert.equal(halftone(image(255,255,255),64,64,s).transparent,100)
   assert.equal(halftone(image(0,0,0),64,64,s).transparent,0)
 })
+test('protected color is selected from the original source and preserves alpha', () => {
+  const source=image(255,255,255,128)
+  const near=image(248,248,248,96)
+  const s={...settings,protectSolid:true,protectSolidColor:'#ffffff',protectSolidTolerance:10}
+  const protectedResult=halftone(near,64,64,s,near,source)
+  assert.equal(protectedResult.protectedMask[0],1)
+  assert.equal(protectedResult.data[3],0)
+  assert.equal(halftone(image(255,255,255),64,64,{...s,background:'white'}).protectedMask[0],0)
+})
 test('white garment preset produces real dots and preserves mean tone on white at each output DPI',()=>{
   const side=256
   const colors=[[128,128,128],[60,45,30],[235,25,15],[245,236,210],[230,145,145]]

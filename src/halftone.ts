@@ -18,13 +18,15 @@ export type HalftoneSettings = {
   protectSolid?: boolean
   protectSolidColor?: string
   protectSolidTolerance?: number
+  protectSmoothEdge?: boolean
 }
 
 // Clustered ordered screening: retain the source detail inside each dot.
 // Partial alpha uses four subpixel samples; solid alpha samples the pixel
 // center. Promoting ANY subpixel hit to opaque would dilate every dot.
-export function halftone(data: Uint8ClampedArray, width: number, height: number, s: HalftoneSettings, selectionSource=data) {
+export function halftone(data: Uint8ClampedArray, width: number, height: number, s: HalftoneSettings, selectionSource=data, protectionSource=selectionSource) {
   const output = new Uint8ClampedArray(data.length)
+  const protectedMask = new Uint8Array(width * height)
   const retain=s.background==='custom'?colorRangeRetention(s.colorRange??defaultColorRange):null
   // A custom range is a removal mask layered over the normal black/white
   // screening path selected before sampling. It is not a third screening mode.
@@ -72,7 +74,6 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
     const colorAlpha=retain?retain(selectionSource[i],selectionSource[i+1],selectionSource[i+2]):1
     if(!colorAlpha){transparent++;continue}
     if(whiteMask?.[y*width+x]){transparent++;continue}
-    const protect = !!protection && colorDistance(selectionSource[i], selectionSource[i+1], selectionSource[i+2], protection[0], protection[1], protection[2]) <= protectionDistance
     const distance = Math.min(sides[0] ? y : Infinity, sides[1] ? width - 1 - x : Infinity, sides[2] ? height - 1 - y : Infinity, sides[3] ? x : Infinity) - trim
     const t = feather > 0 ? clamp(distance / feather) : distance < 0 ? 0 : 1
     const edgeAlpha = t * t * (3 - 2 * t)
@@ -144,12 +145,8 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
     }
     const removed = coverage === 0 && s.background !== 'none'
     if (removed) { transparent++; continue }
-    if (protect) {
-      output[i] = selectionSource[i]; output[i + 1] = selectionSource[i + 1]; output[i + 2] = selectionSource[i + 2]
-      output[i + 3] = Math.round(data[i + 3] * edgeAlpha)
-      if (!output[i + 3]) transparent++
-      continue
-    }
+    const protect = !!protection && colorDistance(protectionSource[i], protectionSource[i+1], protectionSource[i+2], protection[0], protection[1], protection[2]) <= protectionDistance
+    if (protect) { protectedMask[y * width + x] = 1; continue }
     coverage = clamp((coverage - .5) * s.contrast / 100 + .5 + (s.brightness - 100) / 100)
     if (s.invert) coverage = 1 - coverage
     coverage = Math.pow(coverage, 1 / (s.gamma ?? 1))
@@ -203,7 +200,7 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
       }
     }
   }
-  return { data: output, transparent: Math.round(transparent / (width * height) * 100) }
+  return { data: output, protectedMask, transparent: Math.round(transparent / (width * height) * 100) }
 }
 
 function parseHexColor(hex: string): [number, number, number] | null {

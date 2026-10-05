@@ -32,9 +32,20 @@ self.onmessage = async (event) => {
     }
     progress(76)
     const softened = smoothRgba(resized, width, height, settings.preSmooth ?? 0)
-    const result = halftone(autoAdjust(softened, settings), width, height, settings, softened)
+    const result = halftone(autoAdjust(softened, settings), width, height, settings, softened, resized)
+    for (let p = 0; p < result.protectedMask.length; p++) if (result.protectedMask[p]) {
+      const i = p * 4
+      result.data[i] = result.data[i + 1] = result.data[i + 2] = result.data[i + 3] = 0
+    }
     removeTinyDots(result.data, width, height, settings.minDotSize ?? 0)
     removeSmallParticles(result.data, width, height, settings.particleMinSize ?? 0)
+    for (let p = 0; p < result.protectedMask.length; p++) if (result.protectedMask[p]) {
+      const i = p * 4
+      result.data[i] = resized[i]
+      result.data[i + 1] = resized[i + 1]
+      result.data[i + 2] = resized[i + 2]
+      result.data[i + 3] = settings.protectSmoothEdge === false ? 255 : resized[i + 3]
+    }
     result.transparent = Math.round(result.data.reduce((count: number, _, index: number) => index % 4 === 3 && result.data[index] === 0 ? count + 1 : count, 0) / (width * height) * 100)
     progress(96)
     self.postMessage({...result, original: resized, warning}, { transfer: [result.data.buffer, resized.buffer] })

@@ -60,6 +60,7 @@ export type Settings = {
   protectSolid: boolean
   protectSolidColor: string
   protectSolidTolerance: number
+  protectSmoothEdge: boolean
 }
 
 const defaults: Settings = {
@@ -100,6 +101,7 @@ const defaults: Settings = {
   protectSolid: false,
   protectSolidColor: '#ffffff',
   protectSolidTolerance: 10,
+  protectSmoothEdge: true,
 }
 
 const initialSettings:Settings = {...defaults,...presets.default.values}
@@ -126,7 +128,7 @@ function readSavedPresets(): SavedPreset[] {
         && (s.whiteDetail===undefined||(Number.isFinite(s.whiteDetail)&&s.whiteDetail>=0&&s.whiteDetail<=100))
         && (s.backgroundCleanup===undefined||(Number.isFinite(s.backgroundCleanup)&&s.backgroundCleanup>=0&&s.backgroundCleanup<=100))
         && ['enabled','preserveColor','invert'].every(key => typeof s[key] === 'boolean')
-        && typeof s.protectSolid === 'boolean' && typeof s.protectSolidColor === 'string' && /^#[0-9a-f]{6}$/i.test(s.protectSolidColor)
+        && typeof s.protectSolid === 'boolean' && typeof s.protectSolidColor === 'string' && /^#[0-9a-f]{6}$/i.test(s.protectSolidColor) && typeof s.protectSmoothEdge === 'boolean'
         && ['autoTone','autoContrast','autoColor','solidAlpha'].every(key => s[key] === undefined || typeof s[key] === 'boolean')
         && Array.isArray(s.edgeSides) && s.edgeSides.length === 4 && s.edgeSides.every((v:unknown) => typeof v === 'boolean')
     }).map(p=>({...p,settings:{...defaults,...p.settings}}))
@@ -481,7 +483,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       setBrushTool(false)
       setCrop(document?.crop ?? null)
       setEditingAssetId(assetId)
-      if(document){setSettings({...document.settings,edgeSides:[...document.settings.edgeSides]});if(document.garment)setGarment(document.garment);setPreset('custom')}
+      if(document){setSettings({...defaults,...document.settings,edgeSides:[...document.settings.edgeSides]});if(document.garment)setGarment(document.garment);setPreset('custom')}
       setShowCrop(false)
       setDimensions({ width: document?.crop?.width ?? img.naturalWidth, height: document?.crop?.height ?? img.naturalHeight })
       setWidthCm((physicalWidth ?? img.naturalWidth / sourceDpi * 2.54).toFixed(4))
@@ -858,6 +860,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
                 <label className="color-picker-field"><span>Color protegido</span><input aria-label="Color protegido" type="color" value={settings.protectSolidColor} onChange={e => update('protectSolidColor', e.target.value)} /></label>
                 <div className="solid-protection-presets"><button type="button" onClick={() => {update('protectSolidColor','#ffffff');update('protectSolid',true)}}>Proteger blancos</button><button type="button" onClick={() => {update('protectSolidColor','#000000');update('protectSolid',true)}}>Proteger negros</button></div>
                 <RangeControl label="Tolerancia de color" value={settings.protectSolidTolerance} min={0} max={40} unit="%" onChange={v => update('protectSolidTolerance', v)} />
+                <div className="row-label"><span>Conservar borde suave</span><Toggle checked={settings.protectSmoothEdge} onChange={v => update('protectSmoothEdge', v)} /></div>
                 <p className="help-text">El color elegido y sus tonos cercanos quedan sólidos y fuera del semitono. Recomendado para logos, tipografías y brillos. No protege colores que el fondo seleccionado ya elimina.</p>
               </>}
             </div>
