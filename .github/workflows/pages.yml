@@ -10,7 +10,9 @@ permissions:
 
 concurrency:
   group: github-pages
-  cancel-in-progress: false
+  # Pages only needs the newest artifact. Replacing queued deployments avoids
+  # serving an older build when several fixes are pushed in succession.
+  cancel-in-progress: true
 
 jobs:
   build:
