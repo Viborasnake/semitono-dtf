@@ -57,6 +57,9 @@ export type Settings = {
   preSmooth: number
   particleMinSize: number
   minDotSize: number
+  protectSolid: boolean
+  protectSolidColor: string
+  protectSolidTolerance: number
 }
 
 const defaults: Settings = {
@@ -94,6 +97,9 @@ const defaults: Settings = {
   preSmooth: 0,
   particleMinSize: 0,
   minDotSize: 0,
+  protectSolid: false,
+  protectSolidColor: '#ffffff',
+  protectSolidTolerance: 10,
 }
 
 const initialSettings:Settings = {...defaults,...presets.default.values}
@@ -110,7 +116,7 @@ function readSavedPresets(): SavedPreset[] {
       if (!p || typeof p.id !== 'string' || !p.id.startsWith('saved:') || typeof p.name !== 'string' || !p.name.trim() || !p.settings) return false
       const s = p.settings
       if(p.garment!==undefined&&!['dark','light'].includes(p.garment))return false
-      const ranges = {lpi:[12,65],angle:[0,90],size:[45,125],contrast:[50,180],brightness:[60,140],whiteCutoff:[170,255],tolerance:[0,100],featherMm:[0,30],trimMm:[0,15],cornerRadiusMm:[0,50],sharpness:[0,100],gamma:[.5,2],temperature:[-100,100],tint:[-100,100],autoColorStrength:[0,100],autoToneStrength:[0,100],autoContrastStrength:[0,100],preSmooth:[0,2],particleMinSize:[0,12],minDotSize:[0,2]}
+      const ranges = {lpi:[12,65],angle:[0,90],size:[45,125],contrast:[50,180],brightness:[60,140],whiteCutoff:[170,255],tolerance:[0,100],featherMm:[0,30],trimMm:[0,15],cornerRadiusMm:[0,50],sharpness:[0,100],gamma:[.5,2],temperature:[-100,100],tint:[-100,100],autoColorStrength:[0,100],autoToneStrength:[0,100],autoContrastStrength:[0,100],preSmooth:[0,2],particleMinSize:[0,12],minDotSize:[0,2],protectSolidTolerance:[0,100]}
       return Object.entries(ranges).every(([key,[min,max]]) => Number.isFinite(s[key]) && s[key] >= min && s[key] <= max)
         && ['circle','square','line'].includes(s.shape) && ['black','white','none','custom'].includes(s.background)
         && (s.colorRange===undefined||validColorRange(s.colorRange))
@@ -120,6 +126,7 @@ function readSavedPresets(): SavedPreset[] {
         && (s.whiteDetail===undefined||(Number.isFinite(s.whiteDetail)&&s.whiteDetail>=0&&s.whiteDetail<=100))
         && (s.backgroundCleanup===undefined||(Number.isFinite(s.backgroundCleanup)&&s.backgroundCleanup>=0&&s.backgroundCleanup<=100))
         && ['enabled','preserveColor','invert'].every(key => typeof s[key] === 'boolean')
+        && typeof s.protectSolid === 'boolean' && typeof s.protectSolidColor === 'string' && /^#[0-9a-f]{6}$/i.test(s.protectSolidColor)
         && ['autoTone','autoContrast','autoColor','solidAlpha'].every(key => s[key] === undefined || typeof s[key] === 'boolean')
         && Array.isArray(s.edgeSides) && s.edgeSides.length === 4 && s.edgeSides.every((v:unknown) => typeof v === 'boolean')
     }).map(p=>({...p,settings:{...defaults,...p.settings}}))
@@ -163,6 +170,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const viewportRef = useRef<HTMLDivElement>(null)
   const [handTool, setHandTool] = useState(false)
   const [brushTool, setBrushTool] = useState(false)
+  const [refinementTab, setRefinementTab] = useState<'clean'|'solid'>('clean')
   const [brushSize, setBrushSize] = useState(24)
   const [brushCursor, setBrushCursor] = useState<{x:number;y:number}|null>(null)
   const manualErase = useRef<{data:Uint8Array;width:number;height:number}|null>(null)
@@ -827,18 +835,31 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           <section className={`control-card ${collapsedPanels.refinamiento ? '' : 'open'}`}>
             <button className="section-heading" aria-expanded={!collapsedPanels.refinamiento} aria-controls="refinement-controls" onClick={() => togglePanel('refinamiento')}><span><Sparkles size={17} /> Refinamiento</span><ChevronDown size={17} /></button>
             <div className="section-body" id="refinement-controls" hidden={collapsedPanels.refinamiento}>
-              <RangeControl label="Eliminar partículas pequeñas" value={settings.particleMinSize} min={0} max={12} unit=" px" onChange={v => update('particleMinSize', v)} />
-              <p className="help-text">Elimina islas de tinta conectadas menores al tamaño indicado. 0 px desactiva la limpieza.</p>
-              <RangeControl label="Tamaño mínimo de punto" value={settings.minDotSize} min={0} max={2} step={0.1} unit=" px" onChange={v => update('minDotSize', v)} />
-              <p className="help-text">Descarta puntos con una cobertura menor al mínimo visible. Úsalo con moderación para no perder detalle fino.</p>
-              <RangeControl label="Suavizado previo" value={settings.preSmooth} min={0} max={2} step={1} unit=" px" onChange={v => update('preSmooth', v)} />
-              <p className="help-text">Suaviza el original antes del semitono para reducir ruido y variaciones de antialiasing.</p>
-              <div className="brush-tools">
-                <button type="button" className={`btn ${brushTool ? 'active' : ''}`} onClick={() => {setBrushTool(v => !v);setHandTool(false)}} disabled={!output || processing}>{brushTool ? 'Cerrar pincel' : 'Pincel de limpieza'}</button>
-                {brushTool && <RangeControl label="Tamaño del pincel" value={brushSize} min={4} max={120} unit=" px" onChange={setBrushSize} />}
-                {brushTool && <button type="button" className="text-button" onClick={clearManualBrush}>Restaurar borrado del pincel</button>}
-                {brushTool && <p className="help-text">Retoque puntual sobre el resultado. Arrastra sobre las pintitas o bordes contaminados; la imagen original permanece intacta.</p>}
+              <div className="refinement-tabs" role="tablist" aria-label="Herramientas de refinamiento">
+                <button type="button" role="tab" aria-selected={refinementTab==='clean'} className={refinementTab==='clean'?'active':''} onClick={() => setRefinementTab('clean')}>Limpiar</button>
+                <button type="button" role="tab" aria-selected={refinementTab==='solid'} className={refinementTab==='solid'?'active':''} onClick={() => setRefinementTab('solid')}>Proteger sólidos</button>
               </div>
+              {refinementTab === 'clean' && <>
+                <RangeControl label="Eliminar partículas pequeñas" value={settings.particleMinSize} min={0} max={12} unit=" px" onChange={v => update('particleMinSize', v)} />
+                <p className="help-text">Elimina islas de tinta conectadas menores al tamaño indicado. 0 px desactiva la limpieza.</p>
+                <RangeControl label="Tamaño mínimo de punto" value={settings.minDotSize} min={0} max={2} step={0.1} unit=" px" onChange={v => update('minDotSize', v)} />
+                <p className="help-text">Descarta puntos demasiado pequeños para imprimir. Úsalo con moderación para no perder detalle fino.</p>
+                <RangeControl label="Suavizado previo" value={settings.preSmooth} min={0} max={2} step={1} unit=" px" onChange={v => update('preSmooth', v)} />
+                <p className="help-text">Suaviza el original antes del semitono para reducir ruido y variaciones de antialiasing.</p>
+                <div className="brush-tools">
+                  <button type="button" className={`btn ${brushTool ? 'active' : ''}`} onClick={() => {setBrushTool(v => !v);setHandTool(false)}} disabled={!output || processing}>{brushTool ? 'Cerrar pincel' : 'Pincel de limpieza'}</button>
+                  {brushTool && <RangeControl label="Tamaño del pincel" value={brushSize} min={4} max={120} unit=" px" onChange={setBrushSize} />}
+                  {brushTool && <button type="button" className="text-button" onClick={clearManualBrush}>Restaurar borrado del pincel</button>}
+                  {brushTool && <p className="help-text">Retoque puntual sobre el resultado. Arrastra sobre las pintitas o bordes contaminados; la imagen original permanece intacta.</p>}
+                </div>
+              </>}
+              {refinementTab === 'solid' && <>
+                <div className="row-label"><span>Proteger color sólido</span><Toggle checked={settings.protectSolid} onChange={v => update('protectSolid', v)} /></div>
+                <label className="color-picker-field"><span>Color protegido</span><input aria-label="Color protegido" type="color" value={settings.protectSolidColor} onChange={e => update('protectSolidColor', e.target.value)} /></label>
+                <div className="solid-protection-presets"><button type="button" onClick={() => {update('protectSolidColor','#ffffff');update('protectSolid',true)}}>Proteger blancos</button><button type="button" onClick={() => {update('protectSolidColor','#000000');update('protectSolid',true)}}>Proteger negros</button></div>
+                <RangeControl label="Tolerancia de color" value={settings.protectSolidTolerance} min={0} max={40} unit="%" onChange={v => update('protectSolidTolerance', v)} />
+                <p className="help-text">El color elegido y sus tonos cercanos quedan sólidos y fuera del semitono. Recomendado para logos, tipografías y brillos. No protege colores que el fondo seleccionado ya elimina.</p>
+              </>}
             </div>
           </section>
 
