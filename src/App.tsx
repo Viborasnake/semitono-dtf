@@ -446,6 +446,17 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
 
   const update = <K extends keyof Settings>(key: K, value: Settings[K]) => { if (key === 'autoTone' || key === 'autoToneStrength' || key === 'autoContrast' || key === 'autoContrastStrength' || key === 'autoColor' || key === 'autoColorStrength') setView('result'); setPreset('custom'); setSettings((s) => ({ ...s, [key]: value })) }
 
+  const resetPanel = (panel: 'presets'|'size'|'retoque'|'background'|'trama'|'refinamiento'|'ajustes'|'edges') => {
+    if (panel === 'presets') { applyPreset('default'); return }
+    if (panel === 'size') { setCrop(null); setDpi(300); setWidthCm((dimensions.width / 300 * 2.54).toFixed(4)); setSettings(s => ({...s, resampleMethod: defaults.resampleMethod, sharpness: defaults.sharpness})); return }
+    if (panel === 'retoque') { setSettings(s => ({...s, flattenColor: defaults.flattenColor, flattenColorValue: defaults.flattenColorValue, flattenColorTolerance: defaults.flattenColorTolerance})); colorCorrection.current=null; setColorCorrectionVersion(v=>v+1); setPickColorTool(false); setColorBrushTool(false); return }
+    if (panel === 'background') { setSettings(s => ({...s, background: defaults.background, colorRange: undefined, customBase: undefined, whiteRemoval: defaults.whiteRemoval, whiteCutoff: defaults.whiteCutoff, tolerance: defaults.tolerance, backgroundCleanup: defaults.backgroundCleanup})); return }
+    if (panel === 'trama') { setSettings(s => ({...s, lpi: defaults.lpi, angle: defaults.angle, shape: defaults.shape, size: defaults.size, preserveColor: defaults.preserveColor, invert: defaults.invert, solidAlpha: defaults.solidAlpha, whiteDetail: defaults.whiteDetail})); return }
+    if (panel === 'refinamiento') { setSettings(s => ({...s, preSmooth: defaults.preSmooth, particleMinSize: defaults.particleMinSize, minDotSize: defaults.minDotSize, protectSolid: defaults.protectSolid, protectSolidColor: defaults.protectSolidColor, protectSolidTolerance: defaults.protectSolidTolerance, protectSmoothEdge: defaults.protectSmoothEdge})); clearManualBrush(); return }
+    if (panel === 'ajustes') { setSettings(s => ({...s, contrast: defaults.contrast, brightness: defaults.brightness, gamma: defaults.gamma, temperature: defaults.temperature, tint: defaults.tint, autoTone: defaults.autoTone, autoContrast: defaults.autoContrast, autoColor: defaults.autoColor, autoToneStrength: defaults.autoToneStrength, autoContrastStrength: defaults.autoContrastStrength, autoColorStrength: defaults.autoColorStrength})); return }
+    setSettings(s => ({...s, featherMm: defaults.featherMm, trimMm: defaults.trimMm, cornerRadiusMm: defaults.cornerRadiusMm, edgeSides: [...defaults.edgeSides]}))
+  }
+
   const applyPreset = (key:string) => {
     const p=presets[key]
     if(!p)return
@@ -806,6 +817,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           {showInfo && <div className="tip-card"><p>1. Carga tu imagen y define tamaño y ppp. 2. Elige el fondo a eliminar, preset y bordes. 3. Revisa al 100% y sobre la prenda. 4. Exporta PNG o añade a una plancha. El tamaño se graba en el PNG; comprueba que tu RIP respete los centímetros indicados.</p></div>}
 
           <section className={`control-card ${collapsedPanels.presets ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.presets} aria-controls="preset-controls" onClick={()=>togglePanel('presets')}><span>Presets</span><ChevronDown size={17}/></button><div className="section-body" id="preset-controls" hidden={collapsedPanels.presets}>
+            <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('presets')}>Restablecer valores</button>
             <div className="preset-group"><span className="preset-group-label">Prenda</span><div className="segmented preset-segments" role="group" aria-label="Tono de prenda">{([['dark','Prenda oscura'],['light','Prenda clara']] as const).map(([tone,label])=><button key={tone} type="button" className={activeGarment===tone?'active':''} aria-pressed={activeGarment===tone} onClick={()=>{if(activeGarment!==tone)choosePresetGroup(tone,presetMode)}}>{label}</button>)}</div></div>
             <div className="preset-group"><span className="preset-group-label">Acabado</span><div className="segmented preset-segments" role="group" aria-label="Acabado">{([['halftone','Semitono'],['continuous','Sin semitono']] as const).map(([mode,label])=><button key={mode} type="button" className={presetMode===mode?'active':''} aria-pressed={presetMode===mode} onClick={()=>{if(presetMode!==mode)choosePresetGroup(activeGarment,mode)}}>{label}</button>)}</div></div>
             <label className="field">Preset<select aria-label="Preset" value={preset.startsWith('saved:')||visiblePresets.some(([key])=>key===preset)?preset:'custom'} onChange={e => {
@@ -825,6 +837,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           </div></section>
 
           <section className={`control-card ${collapsedPanels.size ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.size} aria-controls="size-controls" onClick={()=>togglePanel('size')}><span>Tamaño de impresión</span><ChevronDown size={17}/></button><div className="section-body" id="size-controls" hidden={collapsedPanels.size}>
+            <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('size')}>Restablecer valores</button>
             <button className="btn" disabled={loading} onClick={()=>setShowCrop(true)}>Recortar imagen (Crop)</button>
             <button className="btn" disabled={loading||!fileName||!output} onClick={trimToContent}>Recortar al contenido</button>
             <p className="help-text">Quita márgenes transparentes del original, sin ampliar el diseño. Conserva los huecos internos. Puedes deshacer el recorte.</p>{cropMessage&&<p className="help-text" role="status">{cropMessage}</p>}
@@ -854,6 +867,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           <section className={`control-card ${collapsedPanels.retoque ? '' : 'open'}`}>
             <button className="section-heading" aria-expanded={!collapsedPanels.retoque} aria-controls="retouch-controls" onClick={() => togglePanel('retoque')}><span><Pipette size={17} /> Retoque de color</span><ChevronDown size={17} /></button>
             <div className="section-body" id="retouch-controls" hidden={collapsedPanels.retoque}>
+              <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('retoque')}>Restablecer valores</button>
               <div className="row-label"><span>Aplanar color seleccionado</span><Toggle checked={settings.flattenColor} onChange={v => update('flattenColor', v)} /></div>
               <label className="color-picker-field"><span>Color aplanado</span><input aria-label="Color aplanado" type="color" value={settings.flattenColorValue} onChange={e => update('flattenColorValue', e.target.value)} /></label>
               <div className="solid-protection-presets"><button type="button" onClick={() => {update('flattenColorValue','#ffffff');update('flattenColor',true)}}>Aplanar blancos</button><button type="button" onClick={() => {update('flattenColorValue','#000000');update('flattenColor',true)}}>Aplanar negros</button></div>
@@ -868,6 +882,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           </section>
 
           <section className={`control-card ${collapsedPanels.background ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.background} aria-controls="background-controls" onClick={()=>togglePanel('background')}><span>Eliminar fondo</span><ChevronDown size={17}/></button><div className="section-body" id="background-controls" hidden={collapsedPanels.background}>
+            <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('background')}>Restablecer valores</button>
             <div className="segmented"><button className={settings.background === 'black' ? 'active' : ''} onClick={() => update('background', 'black')}>Negro</button><button className={settings.background === 'white' ? 'active' : ''} onClick={() => update('background', 'white')}>Blanco</button><button className={settings.background === 'none' ? 'active' : ''} onClick={() => update('background', 'none')}>Ninguno</button></div>
             {!settings.enabled && settings.background !== 'none' && <><div className="row-label"><span>Alfa sólido (DTF)</span><Toggle checked={settings.solidAlpha} onChange={v => update('solidAlpha', v)} /></div><p className="help-text">Activo: todo píxel visible se exporta opaco (alfa 255); solo el fondo eliminado queda transparente. Recomendado para diseños vectoriales sin semitono.</p></>}
             <button className={`btn color-range-trigger ${settings.background==='custom'?'active':''}`} disabled={!fileName||loading} onClick={()=>setShowColorRange(true)}><Pipette size={16}/><span>{settings.background==='custom'?'Editar rango de color…':'Gotero · Rango de color…'}</span></button>
@@ -883,6 +898,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           <section hidden={!settings.enabled} className={`control-card ${collapsedPanels.trama ? '' : 'open'}`}>
             <button className="section-heading" aria-expanded={!collapsedPanels.trama} aria-controls="trama-controls" onClick={() => togglePanel('trama')}><span><CircleDot size={17} /> Semitono</span><ChevronDown size={17} /></button>
             <div className="section-body" id="trama-controls" hidden={collapsedPanels.trama}>
+              <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('trama')}>Restablecer valores</button>
               <RangeControl label="Frecuencia" value={settings.lpi} min={12} max={65} unit=" LPI" onChange={(v) => update('lpi', v)} />
               <RangeControl label="Ángulo" value={settings.angle} min={0} max={90} step={0.5} unit="°" onChange={(v) => update('angle', v)} />
               <div className="field"><span>Forma del punto</span><div className="segmented shapes">
@@ -902,6 +918,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           <section className={`control-card ${collapsedPanels.refinamiento ? '' : 'open'}`}>
             <button className="section-heading" aria-expanded={!collapsedPanels.refinamiento} aria-controls="refinement-controls" onClick={() => togglePanel('refinamiento')}><span><Sparkles size={17} /> Refinamiento</span><ChevronDown size={17} /></button>
             <div className="section-body" id="refinement-controls" hidden={collapsedPanels.refinamiento}>
+              <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('refinamiento')}>Restablecer valores</button>
               <div className="refinement-tabs" role="tablist" aria-label="Herramientas de refinamiento">
                 <button type="button" role="tab" aria-selected={refinementTab==='clean'} className={refinementTab==='clean'?'active':''} onClick={() => setRefinementTab('clean')}>Limpiar</button>
                 <button type="button" role="tab" aria-selected={refinementTab==='solid'} className={refinementTab==='solid'?'active':''} onClick={() => setRefinementTab('solid')}>Proteger sólidos</button>
@@ -934,6 +951,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           <section className={`control-card ${collapsedPanels.ajustes ? '' : 'open'}`}>
             <button className="section-heading" aria-expanded={!collapsedPanels.ajustes} aria-controls="image-controls" onClick={() => togglePanel('ajustes')}><span><SlidersHorizontal size={17} /> Ajustes de imagen</span><ChevronDown size={17} /></button>
             <div className="section-body" id="image-controls" hidden={collapsedPanels.ajustes}>
+              <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('ajustes')}>Restablecer valores</button>
               <div className="auto-adjustments">
                 <span className="field">Correcciones automáticas</span>
                 {([['autoTone','Tono automático','Amplía el rango de cada canal de color.'],['autoContrast','Contraste automático','Amplía el rango con el mismo ajuste para los tres canales.'],['autoColor','Color automático','Reduce dominantes usando los tonos casi neutros.']] as const).map(([key,label,description]) => <div className="auto-adjust-item" key={key}><button className={`auto-adjust-button ${settings[key] ? 'active' : ''}`} type="button" aria-pressed={settings[key]} title={description} onClick={()=>update(key,!settings[key])}><Sparkles size={14}/><span>{label}</span>{settings[key] && <Check size={14}/>}</button>{settings[key]&&<RangeControl label={`Intensidad ${label.toLowerCase()}`} value={key==='autoTone'?settings.autoToneStrength:key==='autoContrast'?settings.autoContrastStrength:settings.autoColorStrength} min={0} max={100} unit="%" onChange={v=>update(key==='autoTone'?'autoToneStrength':key==='autoContrast'?'autoContrastStrength':'autoColorStrength',v)} />}</div>)}
@@ -953,6 +971,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           </section>
 
           <section className={`control-card ${collapsedPanels.edges ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.edges} aria-controls="edge-controls" onClick={()=>togglePanel('edges')}><span>Suavizar bordes</span><ChevronDown size={17}/></button><div className="section-body" id="edge-controls" hidden={collapsedPanels.edges}>
+            <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('edges')}>Restablecer valores</button>
             <button className="text-button" onClick={() => setSettings(s => ({...s, featherMm: 0, trimMm: 0, cornerRadiusMm: 0, edgeSides: [true,true,true,true]}))}>Reiniciar bordes</button>
             <RangeControl label="Borrar margen" value={settings.trimMm} min={0} max={15} step={0.5} unit=" mm" onChange={v => update('trimMm', v)} />
             <RangeControl label="Desvanecido hacia dentro" value={settings.featherMm} min={0} max={30} step={0.5} unit=" mm" onChange={v => update('featherMm', v)} />
