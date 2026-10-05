@@ -243,6 +243,7 @@ input[type=checkbox] { accent-color:var(--aqua); }
 .advanced-controls { min-width:0; }
 .advanced-controls summary { cursor:pointer; color:#afc7bc; font-size:11px; padding:8px 0; }
 .advanced-body { display:grid; gap:16px; padding-top:12px; }
+.advanced-reset { width:100%; justify-content:center; }
 .control-card[hidden] { display:none!important; }
 .save-preset-form { display:grid; gap:10px; }
 .auto-adjustments { display:grid; gap:8px; }

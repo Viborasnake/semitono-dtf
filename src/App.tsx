@@ -985,7 +985,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               </div>
               {(settings.autoTone||settings.autoContrast)&&<p className="help-text">0% conserva el tono original; 100% aplica toda la corrección automática.</p>}
               <details className="advanced-controls"><summary>Ajustes avanzados de imagen</summary><div className="advanced-body">
-              <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('ajustes')}>Restablecer ajustes avanzados</button>
+              <button type="button" className="btn ghost advanced-reset" onClick={()=>resetPanel('ajustes')}>Restablecer valores avanzados</button>
               <RangeControl label="Contraste" value={settings.contrast} min={50} max={180} unit="%" onChange={(v) => update('contrast', v)} />
               <RangeControl label={settings.background==='white'?'Densidad de tinta':'Brillo'} value={settings.brightness} min={60} max={140} unit="%" onChange={(v) => update('brightness', v)} />
               <RangeControl label="Degradados (gamma)" value={settings.gamma} min={0.5} max={2} step={0.05} onChange={v => update('gamma', v)} />
