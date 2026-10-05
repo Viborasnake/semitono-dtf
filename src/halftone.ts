@@ -80,6 +80,11 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
     const t = feather > 0 ? clamp(distance / feather) : distance < 0 ? 0 : 1
     const edgeAlpha = t * t * (3 - 2 * t)
     if (!edgeAlpha) { transparent++; continue }
+    const sourceSpread = Math.max(protectionSource[i], protectionSource[i+1], protectionSource[i+2]) - Math.min(protectionSource[i], protectionSource[i+1], protectionSource[i+2])
+    const protect = !!protection && colorDistance(protectionSource[i], protectionSource[i+1], protectionSource[i+2], protection[0], protection[1], protection[2]) <= protectionDistance && (!protectionNeutral || sourceSpread <= protectionNeutralSpread)
+    const targetPeak = Math.max(...(protection ?? [0, 0, 0]))
+    const protectionIsRemovedBackground = !!protection && ((processingBackground === 'black' && targetPeak <= s.tolerance * 2.55) || (processingBackground === 'white' && Math.min(...protection) >= s.whiteCutoff - 2.55))
+    if (protect && !protectionIsRemovedBackground) { protectedMask[y * width + x] = 1; continue }
     let r = data[i] / 255, g = data[i + 1] / 255, b = data[i + 2] / 255
     const max = Math.max(r, g, b), min = Math.min(r, g, b)
     let coverage: number
@@ -147,9 +152,6 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
     }
     const removed = coverage === 0 && s.background !== 'none'
     if (removed) { transparent++; continue }
-    const sourceSpread = Math.max(protectionSource[i], protectionSource[i+1], protectionSource[i+2]) - Math.min(protectionSource[i], protectionSource[i+1], protectionSource[i+2])
-    const protect = !!protection && colorDistance(protectionSource[i], protectionSource[i+1], protectionSource[i+2], protection[0], protection[1], protection[2]) <= protectionDistance && (!protectionNeutral || sourceSpread <= protectionNeutralSpread)
-    if (protect) { protectedMask[y * width + x] = 1; continue }
     coverage = clamp((coverage - .5) * s.contrast / 100 + .5 + (s.brightness - 100) / 100)
     if (s.invert) coverage = 1 - coverage
     coverage = Math.pow(coverage, 1 / (s.gamma ?? 1))
