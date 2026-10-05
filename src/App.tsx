@@ -179,13 +179,18 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const viewportRef = useRef<HTMLDivElement>(null)
   const [handTool, setHandTool] = useState(false)
   const [brushTool, setBrushTool] = useState(false)
+  const [colorBrushTool, setColorBrushTool] = useState(false)
+  const [pickColorTool, setPickColorTool] = useState(false)
+  const [colorCorrectionVersion, setColorCorrectionVersion] = useState(0)
   const [refinementTab, setRefinementTab] = useState<'clean'|'solid'>('clean')
   const [brushSize, setBrushSize] = useState(24)
   const [brushCursor, setBrushCursor] = useState<{x:number;y:number}|null>(null)
   const manualErase = useRef<{data:Uint8Array;width:number;height:number}|null>(null)
+  const colorCorrection = useRef<{data:Uint8Array;width:number;height:number}|null>(null)
   const manualBase = useRef<{data:Uint8ClampedArray;width:number;height:number}|null>(null)
   const eraseHistory = useRef<{past:Uint8Array[];future:Uint8Array[]}>({past:[],future:[]})
   const brushing = useRef<number|null>(null)
+  const colorBrushing = useRef<number|null>(null)
   const [spaceHeld, setSpaceHeld] = useState(false)
   const [panning, setPanning] = useState(false)
   const panStart = useRef<{id:number;x:number;y:number;left:number;top:number} | null>(null)
@@ -297,7 +302,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   }, [tool])
 
   const startPan = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (brushTool) return
+    if (brushTool || colorBrushTool || pickColorTool) return
     if ((!handActive && e.button !== 1) || (e.button !== 0 && e.button !== 1)) return
     if (e.target instanceof Element && e.target.closest('.preview-background')) return
     e.preventDefault()
@@ -340,7 +345,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     ctx.putImageData(pixels, left, top)
   }
   const startBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!brushTool || e.button !== 0 || view === 'original' || processing || exporting) return
+    if (!brushTool || colorBrushTool || pickColorTool || e.button !== 0 || view === 'original' || processing || exporting) return
     const canvas = resultCanvas.current
     if (!canvas) return
     const previous = manualErase.current?.width === canvas.width && manualErase.current?.height === canvas.height
@@ -365,6 +370,37 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     brushing.current = null
     setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length,redo:(history.current?.future.length??0)+eraseHistory.current.future.length})
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+  }
+
+  const paintColorAt = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const canvas = resultCanvas.current, point = brushPoint(e)
+    if (!canvas || !point) return
+    const mask = colorCorrection.current?.width === canvas.width && colorCorrection.current.height === canvas.height ? colorCorrection.current.data : new Uint8Array(canvas.width * canvas.height)
+    colorCorrection.current = {data: mask, width: canvas.width, height: canvas.height}
+    const radius = Math.max(1, brushSize / 2 * canvas.width / canvas.getBoundingClientRect().width)
+    const left = Math.max(0, Math.floor(point.x - radius)), right = Math.min(canvas.width - 1, Math.ceil(point.x + radius))
+    const top = Math.max(0, Math.floor(point.y - radius)), bottom = Math.min(canvas.height - 1, Math.ceil(point.y + radius))
+    for (let y = top; y <= bottom; y++) for (let x = left; x <= right; x++) if (Math.hypot(x + .5 - point.x, y + .5 - point.y) <= radius) mask[y * canvas.width + x] = 1
+    setColorCorrectionVersion(v => v + 1)
+  }
+  const startColorBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!colorBrushTool || brushTool || pickColorTool || e.button !== 0 || view === 'original' || processing || exporting) return
+    e.preventDefault(); e.stopPropagation(); colorBrushing.current = e.pointerId
+    e.currentTarget.setPointerCapture(e.pointerId); paintColorAt(e)
+  }
+  const moveColorBrush = (e: ReactPointerEvent<HTMLDivElement>) => { if (colorBrushing.current === e.pointerId) { e.preventDefault(); paintColorAt(e) } }
+  const stopColorBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (colorBrushing.current !== e.pointerId) return
+    colorBrushing.current = null
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+  }
+  const pickOriginalColor = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!pickColorTool || e.button !== 0) return
+    const canvas = sourceCanvas.current, point = brushPoint(e)
+    if (!canvas || !point) return
+    const pixel = canvas.getContext('2d')!.getImageData(Math.round(point.x), Math.round(point.y), 1, 1).data
+    update('flattenColorValue', `#${[pixel[0],pixel[1],pixel[2]].map(v => v.toString(16).padStart(2,'0')).join('')}`)
+    setPickColorTool(false); e.preventDefault(); e.stopPropagation()
   }
 
   const renderManualErase = (canvas: HTMLCanvasElement) => {
@@ -464,7 +500,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     outputHeight: output.height,
     percent: output.width / dimensions.width * 100,
   } : null
-  const renderKey = JSON.stringify([imageVersion, output?.width, output?.height, dpi, settings,crop])
+  const renderKey = JSON.stringify([imageVersion, output?.width, output?.height, dpi, settings,crop,colorCorrectionVersion])
   const resizeKey = JSON.stringify([imageVersion, output?.width, output?.height, dpi, settings.resampleMethod, settings.sharpness, crop])
   const processing = loading || (!!output && readyKey !== renderKey && !error)
   const visibleSize=displaySize ?? dimensions
@@ -485,6 +521,8 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       if (!img.naturalWidth || !img.naturalHeight) { setError('La imagen no tiene dimensiones válidas.'); setLoading(false); return }
       imageRef.current = img
       manualErase.current = null
+      colorCorrection.current = null
+      setColorCorrectionVersion(v => v + 1)
       manualBase.current = null
       eraseHistory.current = {past:[],future:[]}
       setBrushTool(false)
@@ -555,7 +593,9 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
         worker.onerror = () => { if (!cancelled) setError('No se pudo procesar. Reduce el tamaño e inténtalo nuevamente.'); worker?.terminate(); if (processingWorker.current === worker) processingWorker.current = null }
         const cached=resizedCache.current?.key===resizeKey ? new Uint8ClampedArray(resizedCache.current.data) : null
         const workerData=cached??input.data
-        worker.postMessage({ data: workerData, preprocessed: !!cached, width, height, sourceWidth: input.width, sourceHeight: input.height, settings: { ...settings, dpi } }, [workerData.buffer])
+        const correctionData = colorCorrection.current?.width === width && colorCorrection.current.height === height ? new Uint8Array(colorCorrection.current.data) : undefined
+        const message = { data: workerData, colorCorrection: correctionData, preprocessed: !!cached, width, height, sourceWidth: input.width, sourceHeight: input.height, settings: { ...settings, dpi } }
+        worker.postMessage(message, correctionData ? [workerData.buffer, correctionData.buffer] : [workerData.buffer])
         native.width = native.height = 1
       } catch (e) { if (!cancelled) setError((e as Error).message) }
     }, 120)
@@ -818,6 +858,11 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               <label className="color-picker-field"><span>Color aplanado</span><input aria-label="Color aplanado" type="color" value={settings.flattenColorValue} onChange={e => update('flattenColorValue', e.target.value)} /></label>
               <div className="solid-protection-presets"><button type="button" onClick={() => {update('flattenColorValue','#ffffff');update('flattenColor',true)}}>Aplanar blancos</button><button type="button" onClick={() => {update('flattenColorValue','#000000');update('flattenColor',true)}}>Aplanar negros</button></div>
               <RangeControl label="Tolerancia de color" value={settings.flattenColorTolerance} min={0} max={40} unit="%" onChange={v => update('flattenColorTolerance', v)} />
+              <button type="button" className={`btn ${pickColorTool ? 'active' : ''}`} onClick={() => {setPickColorTool(v => !v);setColorBrushTool(false)}} disabled={!fileName || processing}>{pickColorTool ? 'Haz clic en el color original…' : 'Tomar color del original'}</button>
+              <button type="button" className={`btn ${colorBrushTool ? 'active' : ''}`} onClick={() => {setColorBrushTool(v => !v);setPickColorTool(false);setBrushTool(false)}} disabled={!output || processing}>{colorBrushTool ? 'Cerrar pincel corrector' : 'Pincel corrector de color'}</button>
+              {colorBrushTool && <RangeControl label="Tamaño del pincel" value={brushSize} min={4} max={120} unit=" px" onChange={setBrushSize} />}
+              {colorBrushTool && <button type="button" className="text-button" onClick={() => {colorCorrection.current=null;setColorCorrectionVersion(v=>v+1)}}>Restaurar correcciones de color</button>}
+              {colorBrushTool && <p className="help-text">Pinta con el color seleccionado sobre la imagen original. Conserva el alfa y se aplica antes del semitono.</p>}
               <p className="help-text">Convierte el color elegido y sus tonos cercanos en un color plano antes del semitono. Conserva el alfa original y no modifica el resto de la imagen.</p>
             </div>
           </section>
@@ -948,12 +993,12 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <button type="button" className="processing-stop" onClick={stopProcessing}>Detener</button>
           </div>}
 
-          <div className={`canvas-area ${handActive ? 'hand-active' : ''} ${panning ? 'is-panning' : ''} ${brushTool ? 'brush-active' : ''}`} ref={viewportRef} onPointerDownCapture={startPan} onPointerDown={startBrush} onPointerMove={e=>{movePan(e);moveBrush(e)}} onPointerLeave={()=>setBrushCursor(null)} onPointerUp={e=>{stopPan(e);stopBrush(e)}} onPointerCancel={e=>{stopPan(e);stopBrush(e)}} onLostPointerCapture={e=>{stopPan(e);stopBrush(e)}}>
+          <div className={`canvas-area ${handActive ? 'hand-active' : ''} ${panning ? 'is-panning' : ''} ${(brushTool || colorBrushTool || pickColorTool) ? 'brush-active' : ''}`} ref={viewportRef} onPointerDownCapture={startPan} onPointerDown={e=>{pickOriginalColor(e);startColorBrush(e);startBrush(e)}} onPointerMove={e=>{movePan(e);moveColorBrush(e);moveBrush(e)}} onPointerLeave={()=>setBrushCursor(null)} onPointerUp={e=>{stopPan(e);stopColorBrush(e);stopBrush(e)}} onPointerCancel={e=>{stopPan(e);stopColorBrush(e);stopBrush(e)}} onLostPointerCapture={e=>{stopPan(e);stopColorBrush(e);stopBrush(e)}}>
             {!fileName && <div className="start-upload"><Upload size={36}/><h2>{readyForNewImage?'Listo para otro diseño':'Arrastra tu imagen aquí'}</h2><p>{readyForNewImage?'Carga una nueva imagen para continuar':'PNG, JPG, WebP o SVG'}</p><button className="btn export" disabled={loading} onClick={()=>fileInput.current?.click()}>{loading?'Abriendo imagen…':readyForNewImage?'Cargar nueva imagen':'Abrir imagen'}</button>{error && <p className="error-text" role="alert">{error}</p>}</div>}
             <div className="artboard" hidden={!fileName} style={{ width: Math.max(1, visibleSize.width * previewScale), height: Math.max(1, visibleSize.height * previewScale), aspectRatio: `${visibleSize.width} / ${visibleSize.height}`, ...(previewBg !== 'checker' ? { backgroundImage: 'none', backgroundColor: previewBg } : {}) }}>
               <canvas ref={sourceCanvas} className="art-canvas" style={{ clipPath: view === 'split' ? `inset(0 ${100 - split}% 0 0)` : 'none', visibility: view === 'result' ? 'hidden' : 'visible' }} />
               <div className="result-layer" style={{ clipPath: view === 'split' ? `inset(0 0 0 ${split}%)` : 'none', visibility: view === 'original' ? 'hidden' : 'visible' }}><canvas ref={resultCanvas} className="art-canvas" /></div>
-              {brushTool && brushCursor && resultCanvas.current && <div className="brush-cursor" style={{left: brushCursor.x, top: brushCursor.y, width: brushSize * resultCanvas.current.getBoundingClientRect().width / resultCanvas.current.width, height: brushSize * resultCanvas.current.getBoundingClientRect().height / resultCanvas.current.height}} aria-hidden="true" />}
+              {(brushTool || colorBrushTool) && brushCursor && resultCanvas.current && <div className="brush-cursor" style={{left: brushCursor.x, top: brushCursor.y, width: brushSize * resultCanvas.current.getBoundingClientRect().width / resultCanvas.current.width, height: brushSize * resultCanvas.current.getBoundingClientRect().height / resultCanvas.current.height}} aria-hidden="true" />}
               {view === 'split' && !brushTool && <><div className="split-line" style={{ left: `${split}%` }}><span><Minus /><Minus /></span></div><input className="split-input" aria-label="Divisor de comparación" type="range" min="0" max="100" value={split} onChange={(e) => setSplit(Number(e.target.value))} /></>}
             </div>
             {dragging && <div className="drop-overlay"><Upload size={32} /><b>Suelta tu imagen aquí</b><span>PNG, JPG, WebP o SVG</span></div>}

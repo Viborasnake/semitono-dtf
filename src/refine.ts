@@ -33,6 +33,18 @@ export function flattenSelectedColor(data: Uint8ClampedArray, color: string, tol
   return out
 }
 
+export function applyColorCorrection(data: Uint8ClampedArray, mask: Uint8Array, color: string) {
+  const match = /^#?([0-9a-f]{6})$/i.exec(color)
+  if (!match) return data
+  const r = parseInt(match[1].slice(0, 2), 16), g = parseInt(match[1].slice(2, 4), 16), b = parseInt(match[1].slice(4, 6), 16)
+  const out = new Uint8ClampedArray(data)
+  for (let p = 0; p < mask.length; p++) if (mask[p]) {
+    const i = p * 4
+    out[i] = r; out[i + 1] = g; out[i + 2] = b
+  }
+  return out
+}
+
 /** Removes connected alpha islands smaller than the requested pixel area. */
 export function removeSmallParticles(data: Uint8ClampedArray, width: number, height: number, minArea: number) {
   const threshold = Math.max(0, Math.floor(minArea))

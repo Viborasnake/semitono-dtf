@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {flattenSelectedColor,removeSmallParticles, removeTinyDots, smoothRgba} from './refine.ts'
+import {applyColorCorrection,flattenSelectedColor,removeSmallParticles, removeTinyDots, smoothRgba} from './refine.ts'
 
 test('removes only alpha islands smaller than the configured area', () => {
   const data = new Uint8ClampedArray(5 * 3 * 4)
@@ -29,4 +29,10 @@ test('flattens only colors inside the selected tolerance and preserves alpha', (
   const data = new Uint8ClampedArray([250,250,250,90, 210,190,180,140])
   const out = flattenSelectedColor(data, '#ffffff', 12)
   assert.deepEqual(Array.from(out), [255,255,255,90, 210,190,180,140])
+})
+
+test('color correction brush changes only its mask and preserves alpha', () => {
+  const data = new Uint8ClampedArray([10,20,30,80, 40,50,60,120])
+  const out = applyColorCorrection(data, new Uint8Array([1,0]), '#ffffff')
+  assert.deepEqual(Array.from(out), [255,255,255,80, 40,50,60,120])
 })
