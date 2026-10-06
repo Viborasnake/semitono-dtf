@@ -6,6 +6,12 @@ const fixture=():ProjectFile=>({format:'trama-dtf',version:1,name:'Mi trabajo',s
 test('project round trip preserves images, dimensions, DPI and copies',()=>{
   const p=fixture();assert.deepEqual(parseProject(JSON.stringify(p)),p)
 })
+test('project accepts the additional dark garment preview colors',()=>{
+  for(const background of ['#102a43','#3b2418','#c1121f']) {
+    const p=fixture();p.background=background
+    assert.deepEqual(parseProject(JSON.stringify(p)),p)
+  }
+})
 test('project rejects unknown versions, external image URLs and duplicate IDs',()=>{
   const p=fixture();assert.throws(()=>parseProject(JSON.stringify({...p,version:2})))
   p.items[0].dataUrl='https://example.com/image.png';assert.throws(()=>parseProject(JSON.stringify(p)))

@@ -39,7 +39,7 @@ npm run build
 - Comparación interactiva original/resultado.
 - Exportación PNG con transparencia.
 - Trama por píxel con suavizado de bordes, conservación de detalles y eliminación del color de fondo de los bordes.
-- Vista sobre damero, prenda negra, blanca o gris; el fondo de vista previa no se incluye en el PNG.
+- Vista sobre damero y prendas negra, blanca, gris, azul marino, azul oscuro, café oscuro o rojo fuerte; el fondo de vista previa no se incluye en el PNG.
 - Escala manual en porcentaje y botones 100%, 200%, 300% y 400%.
 - Ancho/alto en centímetros con proporciones bloqueadas; 150, 300 o 600 ppp.
 - Ampliación Lanczos-3 con colores ponderados por alfa y nitidez adicional de 0 a 100%.
