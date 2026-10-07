@@ -25,7 +25,7 @@ function checkDocument(d:EditorDocument) {
 }
 export function parseProject(text:string):ProjectFile {
   const p=JSON.parse(text) as ProjectFile
-  if(!p||p.format!=='trama-dtf'||p.version!==1||typeof p.name!=='string'||!p.sheet||!positive(p.sheet.width)||!positive(p.sheet.height)||![150,300,600].includes(p.sheet.dpi)||!Number.isFinite(p.sheet.gap)||p.sheet.gap<0||typeof p.sheet.rotate!=='boolean'||!['checker','black','white','#596778','#304b70','#102a43','#3b2418','#c1121f','#7b2931'].includes(p.background)||!Array.isArray(p.items)||p.items.length>200)fail()
+  if(!p||p.format!=='trama-dtf'||p.version!==1||typeof p.name!=='string'||!p.sheet||!positive(p.sheet.width)||!positive(p.sheet.height)||![150,300,600].includes(p.sheet.dpi)||!Number.isFinite(p.sheet.gap)||p.sheet.gap<0||typeof p.sheet.rotate!=='boolean'||!['checker','black','white','#596778','#304b70','#102a43','#3b2418','#808000','#4b5320','#c1121f','#7b2931'].includes(p.background)||!Array.isArray(p.items)||p.items.length>200)fail()
   const ids=new Set<string>();let copies=0
   for(const a of p.items){
     if(!a||typeof a.id!=='string'||ids.has(a.id)||typeof a.name!=='string'||!png(a.dataUrl)||![a.naturalWidth,a.naturalHeight,a.widthCm,a.heightCm].every(positive)||!Number.isInteger(a.quantity)||a.quantity<1||a.quantity>200)fail()
