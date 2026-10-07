@@ -445,6 +445,14 @@ input[type=checkbox] { accent-color:var(--aqua); }
 .resolution-warning { padding:12px; border:1px solid #976d38; border-radius:8px; color:#f1d4a6; background:#292115; font-size:12px; line-height:1.5; overflow-wrap:anywhere; }
 .resolution-warning ul { padding-left:18px; }
 .resolution-warning label { display:block; margin-top:12px; }
+.halftone-safety-modal { width:min(620px,100%); }
+.safety-metrics { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin:18px 0; }
+.safety-metrics span { display:grid; gap:3px; padding:10px 8px; border:1px solid #2b4439; border-radius:8px; color:#9dac9f; font-size:10px; text-align:center; }
+.safety-metrics b { color:#e7f4ed; font-size:14px; }
+.safety-issues { display:grid; gap:8px; margin:0; padding:0; list-style:none; }
+.safety-issues li { display:grid; gap:3px; padding:10px; border:1px solid #8d6637; border-radius:8px; color:#e8c998; background:#292115; font-size:12px; line-height:1.45; }
+.safety-issues b { color:#ffe2b0; }
+@media(max-width:480px) { .safety-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 .prepress-toggle { width:38px; height:30px; padding:0; justify-content:center; gap:3px; font-size:11px; }
 
 /* Shared editor toolbar controls. */

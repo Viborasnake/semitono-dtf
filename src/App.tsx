@@ -12,6 +12,7 @@ import {migratePresetSettings} from './preset-migration'
 import {garmentPresets as presets,presetsFor,type GarmentTone,type PresetMode} from './garment-presets'
 import {contentBounds,imageContentBounds} from './crop'
 import {createHistory,recordHistory,moveHistory,type History} from './history'
+import {assessHalftoneSafety,type HalftoneSafetyReport} from './halftone-safety'
 import CropPanel, {type CropRect} from './CropPanel'
 import ColorRangePanel from './ColorRangePanel'
 import {defaultColorRange,validColorRange,type ColorRange} from './color-range'
@@ -200,6 +201,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [tool, setTool] = useState<'design' | 'gang'>('design')
   const [workflowStep, setWorkflowStep] = useState<1 | 2 | 3 | 4 | 5>(1)
   const [pendingWorkflowDestination, setPendingWorkflowDestination] = useState<WorkflowDestination | null>(null)
+  const [gangSafetyReport,setGangSafetyReport]=useState<HalftoneSafetyReport|null>(null)
   const [preset, setPreset] = useState('default')
   const [savedPresets, setSavedPresets] = useState<SavedPreset[]>(readSavedPresets)
   const [savingPreset, setSavingPreset] = useState(false)
@@ -782,6 +784,11 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     }, 'image/png')
   }
 
+  const reviewBeforeGang = () => {
+    if (!output || readyKey !== renderKey || loading || exporting || !imageRef.current) return
+    setGangSafetyReport(assessHalftoneSafety({dpi,lpi:settings.lpi,size:settings.size,minDotSize:settings.minDotSize,solidAlpha:settings.solidAlpha,enabled:settings.enabled}))
+  }
+
   const editGangDocument = (document:EditorDocument,name:string,id:string) => {
     loadImage(document.original,name,document.dpi,document.widthCm,document,id)
     setTool('design')
@@ -1029,7 +1036,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <div className="preview-background"><span>Vista sobre</span><select aria-label="Fondo de vista previa" value={previewBg} onChange={(e) => setPreviewBg(e.target.value)}><option value="checker">Transparencia</option><option value="black">Prenda negra</option><option value="white">Prenda blanca</option><option value="#596778">Prenda gris</option><option value="#304b70">Prenda azul marino</option><option value="#102a43">Prenda azul oscuro</option><option value="#3b2418">Prenda café oscuro</option><option value="#808000">Prenda verde olivo</option><option value="#4b5320">Prenda verde militar</option><option value="#c1121f">Prenda rojo fuerte</option><option value="#7b2931">Prenda roja</option></select></div>
             <div className="stage-image-actions">
               <button className="upload-mini" onClick={() => fileInput.current?.click()}><Upload size={15} /> Cambiar imagen</button>
-              <button className="btn gang-send" title="Añadir el diseño procesado y abrir la plancha" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={sendToGang}><Layers3 size={16}/><span>{editingAssetId?'Actualizar en Gang Sheet':'Enviar a Gang Sheet'}</span></button>
+              <button className="btn gang-send" title="Revisar la seguridad de la trama y añadir el diseño a la plancha" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={reviewBeforeGang}><Layers3 size={16}/><span>{editingAssetId?'Revisar y actualizar Gang Sheet':'Revisar y enviar a Gang Sheet'}</span></button>
             </div>
             <input ref={fileInput} hidden type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(e) => { requestImport(e.target.files?.[0]); e.target.value='' }} />
           </div>
@@ -1069,6 +1076,24 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <button type="button" className="btn ghost" onClick={() => setPendingWorkflowDestination(null)}>Volver</button>
             <button type="button" className="btn ghost" onClick={() => resolveWorkflowExit(false)}>Borrar</button>
             <button type="button" className="btn export" onClick={() => resolveWorkflowExit(true)}>Guardar cambio</button>
+          </div>
+        </section>
+      </div>}
+      {gangSafetyReport && <div className="modal-backdrop tool-confirm-backdrop" role="presentation">
+        <section className="import-modal tool-confirm-modal halftone-safety-modal" role="dialog" aria-modal="true" aria-labelledby="halftone-safety-title">
+          <span className="modal-kicker">REVISIÓN PREVIA A GANG SHEET</span>
+          <h2 id="halftone-safety-title">{gangSafetyReport.issues.length?'Revisa estos puntos antes de producir':'Trama lista para enviar'}</h2>
+          <div className="safety-metrics" aria-label="Medidas de seguridad de la trama">
+            <span><b>{settings.lpi} LPI</b>Frecuencia</span>
+            <span><b>{gangSafetyReport.cellPixels.toFixed(1)} px</b>Por celda</span>
+            <span><b>{gangSafetyReport.recommendedMinimumDotPixels} px</b>Punto mínimo sugerido</span>
+            <span><b>{gangSafetyReport.recommendedMinimumDotMm.toFixed(2)} mm</b>A {dpi} ppp</span>
+          </div>
+          {gangSafetyReport.issues.length ? <ul className="safety-issues">{gangSafetyReport.issues.map(issue=><li key={issue.title}><b>{issue.title}</b><span>{issue.message}</span></li>)}</ul> : <p className="help-text">La resolución, frecuencia y tamaño máximo del punto cumplen la referencia de seguridad de esta revisión.</p>}
+          <p className="help-text">Esta revisión detecta riesgos de resolución, tamaño y filtros. Un semitono representa los tonos más claros con transparencias, por lo que no puede garantizar un degradado sin huecos blancos; confirma siempre una prueba física y el comportamiento de tu RIP.</p>
+          <div className="modal-actions">
+            <button type="button" className="btn ghost" onClick={()=>setGangSafetyReport(null)}>Volver a ajustar</button>
+            <button type="button" className="btn export" onClick={()=>{setGangSafetyReport(null);sendToGang()}}>{gangSafetyReport.issues.length?'Enviar de todas formas':'Enviar a Gang Sheet'}</button>
           </div>
         </section>
       </div>}
