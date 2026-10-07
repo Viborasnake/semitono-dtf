@@ -20,7 +20,7 @@ import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleDot, Download, Fol
 
 type Shape = 'circle' | 'square' | 'line'
 type ViewMode = 'result' | 'split' | 'original'
-type WorkflowDestination = {step: 1 | 2 | 3 | 4 | 5; panel?: 'size' | 'retoque' | 'trama' | 'refinamiento'; tool: 'design' | 'gang'}
+type WorkflowDestination = {step: 1 | 2 | 3 | 4 | 5 | 6; panel?: 'size' | 'retoque' | 'trama' | 'refinamiento'; tool: 'design' | 'gang'}
 
 export type Settings = {
   lpi: number
@@ -199,7 +199,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const handActive = handTool || spaceHeld
   const [viewport, setViewport] = useState({width: 600, height: 600})
   const [tool, setTool] = useState<'design' | 'gang'>('design')
-  const [workflowStep, setWorkflowStep] = useState<1 | 2 | 3 | 4 | 5>(1)
+  const [workflowStep, setWorkflowStep] = useState<1 | 2 | 3 | 4 | 5 | 6>(1)
   const [pendingWorkflowDestination, setPendingWorkflowDestination] = useState<WorkflowDestination | null>(null)
   const [gangSafetyReport,setGangSafetyReport]=useState<HalftoneSafetyReport|null>(null)
   const [preset, setPreset] = useState('default')
@@ -779,13 +779,14 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     const replaceId=editingAssetId
     setExporting(true)
     resultCanvas.current?.toBlob(async blob => {
-      try {if(!blob)throw new Error('No se pudo generar el diseño.');const tagged=new Blob([withCanvasPrintProfile(new Uint8Array(await blob.arrayBuffer()),sourceDpi)],{type:'image/png'});setGangSource({id: Date.now(), blob:tagged, widthCm: width, name,document:editorDocument,replaceId});loadId.current++;processingWorker.current?.terminate();processingWorker.current=null;imageRef.current=null;manualErase.current=null;manualBase.current=null;setImageVersion(v=>v+1);setFileName('');setEditingAssetId(undefined);setCrop(null);setLoading(false);setDisplaySize(null);setReadyKey('');setProcessingProgress(0);setBrushTool(false);setError('');setExportMessage('');setReadyForNewImage(true);setWorkflowStep(5);setTool('gang')}
+      try {if(!blob)throw new Error('No se pudo generar el diseño.');const tagged=new Blob([withCanvasPrintProfile(new Uint8Array(await blob.arrayBuffer()),sourceDpi)],{type:'image/png'});setGangSource({id: Date.now(), blob:tagged, widthCm: width, name,document:editorDocument,replaceId});loadId.current++;processingWorker.current?.terminate();processingWorker.current=null;imageRef.current=null;manualErase.current=null;manualBase.current=null;setImageVersion(v=>v+1);setFileName('');setEditingAssetId(undefined);setCrop(null);setLoading(false);setDisplaySize(null);setReadyKey('');setProcessingProgress(0);setBrushTool(false);setError('');setExportMessage('');setReadyForNewImage(true);setWorkflowStep(6);setTool('gang')}
       catch(e){setError((e as Error).message)}finally{setExporting(false)}
     }, 'image/png')
   }
 
   const reviewBeforeGang = () => {
     if (!output || readyKey !== renderKey || loading || exporting || !imageRef.current) return
+    setWorkflowStep(5)
     setGangSafetyReport(assessHalftoneSafety({dpi,lpi:settings.lpi,size:settings.size,minDotSize:settings.minDotSize,solidAlpha:settings.solidAlpha,enabled:settings.enabled}))
   }
 
@@ -842,7 +843,9 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
         <i className="workflow-connector" aria-hidden="true" />
         <button className={`workflow-step ${workflowStep === 4 ? 'active' : ''}`} aria-current={workflowStep === 4 ? 'step' : undefined} onClick={() => goToWorkflow({step:4,tool:'design',panel:'refinamiento'})}><b>4</b><span>Refinamiento</span></button>
         <i className="workflow-connector" aria-hidden="true" />
-        <button className={`workflow-step ${workflowStep === 5 ? 'active' : ''}`} aria-current={workflowStep === 5 ? 'step' : undefined} onClick={() => goToWorkflow({step:5,tool:'gang'})}><b>5</b><span>Gang Sheet</span></button>
+        <button className={`workflow-step ${workflowStep === 5 ? 'active' : ''}`} aria-current={workflowStep === 5 ? 'step' : undefined} onClick={reviewBeforeGang} disabled={!fileName || processing}><b>5</b><span>Revisión</span></button>
+        <i className="workflow-connector" aria-hidden="true" />
+        <button className={`workflow-step ${workflowStep === 6 ? 'active' : ''}`} aria-current={workflowStep === 6 ? 'step' : undefined} onClick={() => goToWorkflow({step:6,tool:'gang'})}><b>6</b><span>Gang Sheet</span></button>
         <span>Todo se procesa en tu equipo</span>
       </nav>
       <div className="gang-container" style={{display: tool === 'gang' ? 'block' : 'none'}}><GangSheet source={gangSource} onImportFile={requestImport} onEditDocument={editGangDocument} previewColor={previewBg} onPreviewColorChange={setPreviewBg} getEditor={snapshotEditor} restoreEditor={restoreProjectEditor} initialProject={initialProject} editorRevision={JSON.stringify([renderKey,fileName,editingAssetId,activeGarment])} editorLoading={loading} onSaveStatus={setProjectStatus} actionsRef={projectActions}/></div>
@@ -1092,7 +1095,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           {gangSafetyReport.issues.length ? <ul className="safety-issues">{gangSafetyReport.issues.map(issue=><li key={issue.title}><b>{issue.title}</b><span>{issue.message}</span></li>)}</ul> : <p className="help-text">La resolución, frecuencia y tamaño máximo del punto cumplen la referencia de seguridad de esta revisión.</p>}
           <p className="help-text">Esta revisión detecta riesgos de resolución, tamaño y filtros. Un semitono representa los tonos más claros con transparencias, por lo que no puede garantizar un degradado sin huecos blancos; confirma siempre una prueba física y el comportamiento de tu RIP.</p>
           <div className="modal-actions">
-            <button type="button" className="btn ghost" onClick={()=>setGangSafetyReport(null)}>Volver a ajustar</button>
+            <button type="button" className="btn ghost" onClick={()=>{setGangSafetyReport(null);setWorkflowStep(4)}}>Volver a ajustar</button>
             <button type="button" className="btn export" onClick={()=>{setGangSafetyReport(null);sendToGang()}}>{gangSafetyReport.issues.length?'Enviar de todas formas':'Enviar a Gang Sheet'}</button>
           </div>
         </section>
