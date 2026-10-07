@@ -16,7 +16,7 @@ import {assessHalftoneSafety,type HalftoneSafetyReport} from './halftone-safety'
 import CropPanel, {type CropRect} from './CropPanel'
 import ColorRangePanel from './ColorRangePanel'
 import {defaultColorRange,validColorRange,type ColorRange} from './color-range'
-import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleDot, Download, FolderOpen, Hand, Image as ImageIcon, Info, Layers3, Minus, Pipette, Plus, RotateCcw, SlidersHorizontal, Sparkles, Trash2, Upload, ZoomIn } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleDot, Download, Eraser, FolderOpen, Frame, Hand, Image as ImageIcon, Info, Layers3, Minus, Pipette, Plus, RotateCcw, Ruler, SlidersHorizontal, Sparkles, SwatchBook, Trash2, Upload, ZoomIn } from 'lucide-react'
 
 type Shape = 'circle' | 'square' | 'line'
 type ViewMode = 'result' | 'split' | 'original'
@@ -854,7 +854,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           <div className="sidebar-title"><div><Sparkles size={18} /><span>Pre-prensa</span></div><div className="sidebar-title-actions"><button type="button" className="sidebar-collapse-toggle" aria-label="Ocultar controles de Pre-prensa" title="Ocultar controles" onClick={()=>setPrepressCollapsed(true)}><ChevronLeft size={17}/></button><button type="button" aria-label="Información" aria-expanded={showInfo} onClick={() => setShowInfo(v => !v)}><Info size={17} /></button></div></div>
           {showInfo && <div className="tip-card"><p>1. Carga tu imagen y define tamaño y ppp. 2. Elige el fondo a eliminar, preset y bordes. 3. Revisa al 100% y sobre la prenda. 4. Exporta PNG o añade a una plancha. El tamaño se graba en el PNG; comprueba que tu RIP respete los centímetros indicados.</p></div>}
 
-          <section className={`control-card ${collapsedPanels.presets ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.presets} aria-controls="preset-controls" onClick={()=>togglePanel('presets')}><span>Presets</span><ChevronDown size={17}/></button><div className="section-body" id="preset-controls" hidden={collapsedPanels.presets}>
+          <section className={`control-card ${collapsedPanels.presets ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.presets} aria-controls="preset-controls" onClick={()=>togglePanel('presets')}><span><SwatchBook size={17} /> Presets</span><ChevronDown size={17}/></button><div className="section-body" id="preset-controls" hidden={collapsedPanels.presets}>
             <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('presets')}>Restablecer valores</button>
             <div className="preset-group"><span className="preset-group-label">Prenda</span><div className="segmented preset-segments" role="group" aria-label="Tono de prenda">{([['dark','Prenda oscura'],['light','Prenda clara']] as const).map(([tone,label])=><button key={tone} type="button" className={activeGarment===tone?'active':''} aria-pressed={activeGarment===tone} onClick={()=>{if(activeGarment!==tone)choosePresetGroup(tone,presetMode)}}>{label}</button>)}</div></div>
             <div className="preset-group"><span className="preset-group-label">Acabado</span><div className="segmented preset-segments" role="group" aria-label="Acabado">{([['halftone','Semitono'],['continuous','Sin semitono']] as const).map(([mode,label])=><button key={mode} type="button" className={presetMode===mode?'active':''} aria-pressed={presetMode===mode} onClick={()=>{if(presetMode!==mode)choosePresetGroup(activeGarment,mode)}}>{label}</button>)}</div></div>
@@ -874,7 +874,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             {presetMessage && <p className="help-text" role="status">{presetMessage}</p>}
           </div></section>
 
-          <section className={`control-card ${collapsedPanels.size ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.size} aria-controls="size-controls" onClick={()=>togglePanel('size')}><span>Tamaño de impresión</span><ChevronDown size={17}/></button><div className="section-body" id="size-controls" hidden={collapsedPanels.size}>
+          <section className={`control-card ${collapsedPanels.size ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.size} aria-controls="size-controls" onClick={()=>togglePanel('size')}><span><Ruler size={17} /> Tamaño de impresión</span><ChevronDown size={17}/></button><div className="section-body" id="size-controls" hidden={collapsedPanels.size}>
             <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('size')}>Restablecer valores</button>
             <button className="btn" disabled={loading} onClick={()=>setShowCrop(true)}>Recortar imagen (Crop)</button>
             <button className="btn" disabled={loading||!fileName||!output} onClick={trimToContent}>Recortar al contenido</button>
@@ -940,7 +940,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             </div>
           </section>
 
-          <section className={`control-card ${collapsedPanels.background ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.background} aria-controls="background-controls" onClick={()=>togglePanel('background')}><span>Eliminar fondo</span><ChevronDown size={17}/></button><div className="section-body" id="background-controls" hidden={collapsedPanels.background}>
+          <section className={`control-card ${collapsedPanels.background ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.background} aria-controls="background-controls" onClick={()=>togglePanel('background')}><span><Eraser size={17} /> Eliminar fondo</span><ChevronDown size={17}/></button><div className="section-body" id="background-controls" hidden={collapsedPanels.background}>
             <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('background')}>Restablecer valores</button>
             <div className="segmented"><button className={settings.background === 'black' ? 'active' : ''} onClick={() => update('background', 'black')}>Negro</button><button className={settings.background === 'white' ? 'active' : ''} onClick={() => update('background', 'white')}>Blanco</button><button className={settings.background === 'none' ? 'active' : ''} onClick={() => update('background', 'none')}>Ninguno</button></div>
             {!settings.enabled && settings.background !== 'none' && <><div className="row-label"><span>Alfa sólido (DTF)</span><Toggle checked={settings.solidAlpha} onChange={v => update('solidAlpha', v)} /></div><p className="help-text">Activo: todo píxel visible se exporta opaco (alfa 255); solo el fondo eliminado queda transparente. Recomendado para diseños vectoriales sin semitono.</p></>}
@@ -1010,7 +1010,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             </div>
           </section>
 
-          <section className={`control-card ${collapsedPanels.edges ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.edges} aria-controls="edge-controls" onClick={()=>togglePanel('edges')}><span>Suavizar bordes</span><ChevronDown size={17}/></button><div className="section-body" id="edge-controls" hidden={collapsedPanels.edges}>
+          <section className={`control-card ${collapsedPanels.edges ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.edges} aria-controls="edge-controls" onClick={()=>togglePanel('edges')}><span><Frame size={17} /> Suavizar bordes</span><ChevronDown size={17}/></button><div className="section-body" id="edge-controls" hidden={collapsedPanels.edges}>
             <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('edges')}>Restablecer valores</button>
             <button className="text-button" onClick={() => setSettings(s => ({...s, featherMm: 0, trimMm: 0, cornerRadiusMm: 0, edgeSides: [true,true,true,true]}))}>Reiniciar bordes</button>
             <RangeControl label="Borrar margen" value={settings.trimMm} min={0} max={15} step={0.5} unit=" mm" onChange={v => update('trimMm', v)} />
