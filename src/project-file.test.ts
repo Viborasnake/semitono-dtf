@@ -6,8 +6,8 @@ const fixture=():ProjectFile=>({format:'trama-dtf',version:1,name:'Mi trabajo',s
 test('project round trip preserves images, dimensions, DPI and copies',()=>{
   const p=fixture();assert.deepEqual(parseProject(JSON.stringify(p)),p)
 })
-test('project accepts the additional dark garment preview colors',()=>{
-  for(const background of ['#102a43','#3b2418','#808000','#4b5320','#c1121f']) {
+test('project accepts every garment preview color',()=>{
+  for(const background of ['#596778','#8ecae6','#2563eb','#304b70','#102a43','#86efac','#16a34a','#166534','#808000','#4b5320','#c4b5fd','#7c3aed','#4c1d95','#fda4af','#c1121f','#7b2931','#fde68a','#f59e0b','#ea580c','#e7d3b0','#a16207','#3b2418']) {
     const p=fixture();p.background=background
     assert.deepEqual(parseProject(JSON.stringify(p)),p)
   }

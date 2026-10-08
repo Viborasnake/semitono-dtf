@@ -276,7 +276,10 @@ input[type=checkbox] { accent-color:var(--aqua); }
 .asset-heading { display:flex; align-items:center; gap:12px; width:100%; min-width:0; min-height:50px; padding:11px 12px; border:0; background:transparent; color:#e6e8e9; text-align:left; font:inherit; font-size:13px; font-weight:600; cursor:pointer; }
 .asset-heading:hover { background:#191d22; }
 .asset-heading:focus-visible { outline:2px solid var(--aqua); outline-offset:-3px; }
-.asset-heading-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.asset-heading-copy { flex:1; min-width:0; display:grid; gap:2px; }
+.asset-heading-name { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.asset-heading-meta { color:#7f8985; font-size:10px; font-weight:500; letter-spacing:.01em; line-height:1.2; }
+.asset-heading-meta i { color:#56615c; font-style:normal; padding:0 1px; }
 .asset-heading svg { flex:none; color:#9aa6a1; transition:transform .18s ease; }
 .asset-heading[aria-expanded="true"] svg { transform:rotate(180deg); }
 .gang-workspace .asset-details { border-top:1px solid #262b31; }
