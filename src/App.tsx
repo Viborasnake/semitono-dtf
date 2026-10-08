@@ -1049,7 +1049,29 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               <button className={view === 'split' ? 'active' : ''} onClick={() => setView('split')}><Layers3 size={15} /> Comparar</button>
               <button className={view === 'result' ? 'active' : ''} onClick={() => setView('result')}><CircleDot size={15} /> Resultado</button>
             </div>
-            <div className="preview-background"><span>Vista sobre</span><select aria-label="Fondo de vista previa" value={previewBg} onChange={(e) => setPreviewBg(e.target.value)}><option value="checker">Transparencia</option><option value="black">Prenda negra</option><option value="white">Prenda blanca</option><option value="#596778">Prenda gris</option><option value="#304b70">Prenda azul marino</option><option value="#102a43">Prenda azul oscuro</option><option value="#3b2418">Prenda café oscuro</option><option value="#808000">Prenda verde olivo</option><option value="#4b5320">Prenda verde militar</option><option value="#c1121f">Prenda rojo fuerte</option><option value="#7b2931">Prenda roja</option></select></div>
+            <div className="preview-background"><span>Vista sobre</span><select aria-label="Fondo de vista previa" value={previewBg} onChange={(e) => setPreviewBg(e.target.value)}>
+              <option value="checker">Transparencia</option>
+              <optgroup label="Neutros · claro → normal → oscuro">
+                <option value="white">Blanco · claro</option>
+                <option value="#596778">Gris · normal</option>
+                <option value="black">Negro · oscuro</option>
+              </optgroup>
+              <optgroup label="Azules · claro → normal → oscuro">
+                <option value="#304b70">Azul marino · normal</option>
+                <option value="#102a43">Azul oscuro · oscuro</option>
+              </optgroup>
+              <optgroup label="Verdes · claro → normal → oscuro">
+                <option value="#808000">Verde olivo · normal</option>
+                <option value="#4b5320">Verde militar · oscuro</option>
+              </optgroup>
+              <optgroup label="Rojos · claro → normal → oscuro">
+                <option value="#c1121f">Rojo fuerte · normal</option>
+                <option value="#7b2931">Rojo oscuro · oscuro</option>
+              </optgroup>
+              <optgroup label="Cafés · claro → normal → oscuro">
+                <option value="#3b2418">Café oscuro · oscuro</option>
+              </optgroup>
+            </select></div>
             <div className="stage-image-actions">
               <button className="upload-mini" onClick={() => fileInput.current?.click()}><Upload size={15} /> Cambiar imagen</button>
               <button className="btn gang-send" title="Revisar la seguridad de la trama y añadir el diseño a la plancha" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={reviewBeforeGang}><Layers3 size={16}/><span>{editingAssetId?'Revisar y actualizar Gang Sheet':'Revisar y enviar a Gang Sheet'}</span></button>
