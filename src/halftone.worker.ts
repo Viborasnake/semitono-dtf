@@ -10,6 +10,7 @@ self.onmessage = async (event) => {
     const progress = (value: number) => self.postMessage({ type: 'progress', progress: value })
     progress(8)
     let resized: Uint8ClampedArray
+    let appliedNeuralScale = event.data.preprocessed ? (event.data.preprocessedNeuralScale ?? 1) : 1
     let warning: string | undefined
     if (preprocessed) {
       resized = new Uint8ClampedArray(data)
@@ -22,7 +23,7 @@ self.onmessage = async (event) => {
       if (sourceWidth * sourceHeight > 4_000_000) {
         warning = 'La imagen es demasiado grande para Neural; se usó Lanczos-3 para evitar un error de memoria.'
       } else {
-        try { neural = await neuralUpscaleRgba(data, sourceWidth, sourceHeight, neuralScale, fraction => progress(8 + Math.round(54 * fraction))) }
+        try { neural = await neuralUpscaleRgba(data, sourceWidth, sourceHeight, neuralScale, fraction => progress(8 + Math.round(54 * fraction))); if (neural) appliedNeuralScale = neuralScale }
         catch (error) { warning = `Neural no pudo procesar esta imagen; se usó Lanczos-3 como respaldo.${import.meta.env.DEV && error instanceof Error ? ` ${error.message}` : ''}` }
       }
     }
@@ -50,7 +51,7 @@ self.onmessage = async (event) => {
     }
     result.transparent = Math.round(result.data.reduce((count: number, _, index: number) => index % 4 === 3 && result.data[index] === 0 ? count + 1 : count, 0) / (width * height) * 100)
     progress(96)
-    self.postMessage({...result, original: resized, warning}, { transfer: [result.data.buffer, resized.buffer] })
+    self.postMessage({...result, original: resized, warning, neuralScale: appliedNeuralScale}, { transfer: [result.data.buffer, resized.buffer] })
   } catch (error) {
     self.postMessage({ error: error instanceof Error ? error.message : 'No se pudo procesar la imagen.' })
   }

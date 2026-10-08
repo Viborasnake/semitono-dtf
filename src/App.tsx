@@ -228,7 +228,8 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [loading, setLoading] = useState(false)
   const [processingProgress, setProcessingProgress] = useState(0)
   const processingWorker = useRef<Worker | null>(null)
-  const resizedCache = useRef<{key:string;data:Uint8ClampedArray;width:number;height:number}|null>(null)
+  const resizedCache = useRef<{key:string;data:Uint8ClampedArray;width:number;height:number;neuralScale:number}|null>(null)
+  const [appliedNeuralScale,setAppliedNeuralScale]=useState(1)
   const [exporting, setExporting] = useState(false)
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const exportMenuRef = useRef<HTMLDivElement>(null)
@@ -618,7 +619,8 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             // Resize only when the replacement is ready: resizing clears canvas pixels.
             const originalPixels=new ImageData(data.original,width,height)
             const resultPixels=new ImageData(data.data,width,height)
-            resizedCache.current={key:resizeKey,data:new Uint8ClampedArray(data.original),width,height}
+            resizedCache.current={key:resizeKey,data:new Uint8ClampedArray(data.original),width,height,neuralScale:data.neuralScale ?? 1}
+            setAppliedNeuralScale(data.neuralScale ?? 1)
             src.width = out.width = width
             src.height = out.height = height
             src.getContext('2d')!.putImageData(originalPixels, 0, 0)
@@ -634,10 +636,11 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           if (processingWorker.current === worker) processingWorker.current = null
         }
         worker.onerror = () => { if (!cancelled) setError('No se pudo procesar. Reduce el tamaño e inténtalo nuevamente.'); worker?.terminate(); if (processingWorker.current === worker) processingWorker.current = null }
-        const cached=resizedCache.current?.key===resizeKey ? new Uint8ClampedArray(resizedCache.current.data) : null
+        const cachedEntry=resizedCache.current?.key===resizeKey ? resizedCache.current : null
+        const cached=cachedEntry ? new Uint8ClampedArray(cachedEntry.data) : null
         const workerData=cached??input.data
         const correctionData = colorCorrection.current?.width === width && colorCorrection.current.height === height ? new Uint8Array(colorCorrection.current.data) : undefined
-        const message = { data: workerData, colorCorrection: correctionData, preprocessed: !!cached, width, height, sourceWidth: input.width, sourceHeight: input.height, settings: { ...settings, dpi } }
+        const message = { data: workerData, colorCorrection: correctionData, preprocessed: !!cached, preprocessedNeuralScale:cachedEntry?.neuralScale, width, height, sourceWidth: input.width, sourceHeight: input.height, settings: { ...settings, dpi } }
         worker.postMessage(message, correctionData ? [workerData.buffer, correctionData.buffer] : [workerData.buffer])
         native.width = native.height = 1
       } catch (e) { if (!cancelled) setError((e as Error).message) }
@@ -790,7 +793,8 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     if (!output || readyKey !== renderKey || loading || exporting || !imageRef.current) return
     if(action==='gang')setWorkflowStep(5)
     setPrintReviewAction(action)
-    setGangSafetyReport(assessHalftoneSafety({dpi,sourceDpi:dimensions.width/output.widthCm*2.54,lpi:settings.lpi,size:settings.size,minDotSize:settings.minDotSize,solidAlpha:settings.solidAlpha,enabled:action==='resized'?false:settings.enabled}))
+    const upscaleFactor = appliedNeuralScale
+    setGangSafetyReport(assessHalftoneSafety({dpi,sourceDpi:dimensions.width/output.widthCm*2.54,upscaleFactor,lpi:settings.lpi,size:settings.size,minDotSize:settings.minDotSize,solidAlpha:settings.solidAlpha,enabled:action==='resized'?false:settings.enabled}))
   }
   const reviewBeforeGang = () => reviewPrint('gang')
   const reviewBeforeExport = () => reviewPrint('export')
@@ -1122,13 +1126,14 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           <span className="modal-kicker">REVISIÓN PREVIA A GANG SHEET</span>
           <h2 id="halftone-safety-title">{gangSafetyReport.issues.length?'Revisa estos puntos antes de producir':'Trama lista para enviar'}</h2>
           <div className="safety-metrics" aria-label="Medidas de seguridad de la trama">
-            <span><b>{Math.round(gangSafetyReport.sourceDpi)} ppp</b>Original efectivo</span>
+            <span><b>{Math.round(gangSafetyReport.sourceDpi)} ppp</b>{gangSafetyReport.generatedResolution ? 'Resolución Neural' : 'Original efectivo'}</span>
             <span><b>{settings.lpi} LPI</b>Frecuencia</span>
             <span><b>{gangSafetyReport.cellPixels.toFixed(1)} px</b>Por celda</span>
             <span><b>{gangSafetyReport.recommendedMinimumDotPixels} px</b>Punto mínimo sugerido</span>
             <span><b>{gangSafetyReport.recommendedMinimumDotMm.toFixed(2)} mm</b>A {dpi} ppp</span>
           </div>
           {gangSafetyReport.issues.length ? <ul className="safety-issues">{gangSafetyReport.issues.map(issue=><li key={issue.title}><b>{issue.title}</b><span>{issue.message}</span></li>)}</ul> : <p className="help-text">La resolución, frecuencia y tamaño máximo del punto cumplen la referencia de seguridad de esta revisión.</p>}
+          {gangSafetyReport.generatedResolution && <p className="help-text">Neural generó píxeles adicionales antes de la trama. Mejora la resolución disponible para esta salida, pero el detalle creado es estimado: revísalo al 100% y con una prueba física.</p>}
           <p className="help-text">Esta revisión detecta riesgos de resolución, tamaño y filtros. Un semitono representa los tonos más claros con transparencias, por lo que no puede garantizar un degradado sin huecos blancos; confirma siempre una prueba física y el comportamiento de tu RIP.</p>
           <div className="modal-actions">
             <button type="button" className="btn ghost" onClick={()=>{const action=printReviewAction;setGangSafetyReport(null);setPrintReviewAction(null);if(action==='gang')setWorkflowStep(4)}}>Volver a ajustar</button>

@@ -27,6 +27,13 @@ test('flags an original that is being enlarged beyond its effective resolution',
   assert.ok(report.issues.some(issue=>issue.title==='El original se está ampliando'))
 })
 
+test('uses Neural-generated pixels when checking available output resolution',()=>{
+  const report=assessHalftoneSafety({...base,sourceDpi:161,upscaleFactor:2})
+  assert.equal(Math.round(report.sourceDpi),322)
+  assert.equal(report.generatedResolution,true)
+  assert.ok(!report.issues.some(issue=>issue.title==='El original se está ampliando'))
+})
+
 test('does not issue screening warnings for continuous output',()=>{
   assert.equal(assessHalftoneSafety({...base,enabled:false,solidAlpha:false}).issues.length,0)
 })
