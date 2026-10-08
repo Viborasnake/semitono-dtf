@@ -75,6 +75,11 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
   const initial=useRef(initialProject.sheet)
   const [width,setWidth] = useState(initial.current.width)
   const [height,setHeight] = useState(initial.current.height)
+  // Keep editable text separate from the applied sheet dimensions. Updating the
+  // numeric state while someone types makes inputs such as "100" briefly become
+  // invalid ("" / "1"), triggering an expensive re-layout on every keystroke.
+  const [widthDraft,setWidthDraft] = useState(String(initial.current.width))
+  const [heightDraft,setHeightDraft] = useState(String(initial.current.height))
   const [dpi,setDpi] = useState(initial.current.dpi)
   const [gap,setGap] = useState(initial.current.gap)
   const [rotate,setRotate] = useState(initial.current.rotate)
@@ -95,6 +100,13 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
   const historyApplying=useRef(false)
   const [historyCounts,setHistoryCounts]=useState({undo:0,redo:0})
   const serializedImages=useRef(new WeakMap<object,string>())
+  useEffect(()=>setWidthDraft(String(width)),[width])
+  useEffect(()=>setHeightDraft(String(height)),[height])
+  function commitSheetDimension(value:string,current:number,apply:(next:number)=>void,setDraft:(next:string)=>void) {
+    const next=Number(value.replace(',','.'))
+    if(Number.isFinite(next)&&next>=1)apply(next)
+    else setDraft(String(current))
+  }
   function projectSnapshot():ProjectFile {
     const editor=getEditor?.()
     if(editor?.assetId&&!items.some(a=>a.id===editor.assetId))delete editor.assetId
@@ -278,7 +290,7 @@ export default function GangSheet({source,onImportFile,onEditDocument,previewCol
     <div className={`control-card ${sheetOpen?'open':''}`}><button type="button" className="section-heading" aria-expanded={sheetOpen} aria-controls="gang-sheet-settings" onClick={()=>setSheetOpen(open=>!open)}><span>Plancha de impresión</span><ChevronDown size={18} aria-hidden="true"/></button><div className="section-body" id="gang-sheet-settings" hidden={!sheetOpen}>
       <label className="field">Nombre del trabajo<input aria-label="Nombre del trabajo" value={projectName} maxLength={80} onChange={e=>setProjectName(e.target.value)}/></label>
       <div className="field"><span>Mis presets de plancha</span>{sheetPresets.length>0&&<div className="sheet-presets">{sheetPresets.map(p=><div className="sheet-preset" key={p.id}><button type="button" aria-pressed={width===p.width&&height===p.height} onClick={()=>{setWidth(p.width);setHeight(p.height)}}>{p.name}<small>{p.width} × {p.height} cm</small></button><button type="button" className="sheet-preset-delete" aria-label={`Eliminar preset ${p.name}`} title="Eliminar preset" onClick={()=>deleteSheetPreset(p.id)}><Trash2 size={14}/></button></div>)}</div>}<div className="sheet-preset-save"><input aria-label="Nombre del preset de plancha" placeholder="Nombre del preset" value={sheetPresetName} onChange={e=>setSheetPresetName(e.target.value)} onKeyDown={e=>{if(e.key==='Enter'){e.preventDefault();saveSheetPreset()}}}/><button type="button" className="btn" disabled={!sheetPresetName.trim()} onClick={saveSheetPreset}>Guardar</button></div></div>
-      <div className="dimension-fields"><label>Ancho (cm)<input type="number" aria-label="Ancho de plancha" min="1" value={width} onChange={e=>setWidth(Number(e.target.value))}/></label><label>Alto (cm)<input type="number" aria-label="Alto de plancha" min="1" value={height} onChange={e=>setHeight(Number(e.target.value))}/></label></div>
+      <div className="dimension-fields"><label>Ancho (cm)<input type="text" inputMode="decimal" aria-label="Ancho de plancha" value={widthDraft} onChange={e=>setWidthDraft(e.target.value)} onBlur={()=>commitSheetDimension(widthDraft,width,setWidth,setWidthDraft)} onKeyDown={e=>{if(e.key==='Enter'){e.currentTarget.blur()}if(e.key==='Escape'){setWidthDraft(String(width));e.currentTarget.blur()}}}/></label><label>Alto (cm)<input type="text" inputMode="decimal" aria-label="Alto de plancha" value={heightDraft} onChange={e=>setHeightDraft(e.target.value)} onBlur={()=>commitSheetDimension(heightDraft,height,setHeight,setHeightDraft)} onKeyDown={e=>{if(e.key==='Enter'){e.currentTarget.blur()}if(e.key==='Escape'){setHeightDraft(String(height));e.currentTarget.blur()}}}/></label></div>
       <p className="help-text" role="status">Insumo DTF seleccionado: {width} × {height} cm</p>
       <input hidden ref={projectInput} type="file" accept=".json,.trama.json" onChange={e=>{const file=e.target.files?.[0];e.target.value='';if(file)void openProject(file)}}/>
       <div className="dimension-fields compact-fields"><label>Resolución<select aria-label="Resolución de plancha" value={dpi} onChange={e=>setDpi(Number(e.target.value))}><option value="150">150 ppp</option><option value="300">300 ppp</option><option value="600">600 ppp</option></select></label>
