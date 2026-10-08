@@ -53,6 +53,10 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
   const solidAlpha=s.solidAlpha === true || (s.enabled !== false && s.solidAlpha !== false)
   const offsets = solidAlpha ? [.5] : [.25, .75]
   const samples = offsets.length ** 2
+  // With no background removal, barely-visible export residue has no colour
+  // cue to distinguish it from the artwork. Do not promote alpha 1–8/255 to
+  // opaque ink when continuous solid-alpha output is requested.
+  const discardWeakSourceAlpha = s.enabled === false && s.solidAlpha === true && processingBackground === 'none'
   // In continuous solid-alpha mode, isolated low-level JPEG/compression noise
   // must not become opaque ink. Keep weak pixels only when they touch a real
   // foreground pixel, which preserves anti-aliased contours without retaining
@@ -70,7 +74,7 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
   const clamp = (v: number) => Math.max(0, Math.min(1, v))
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
     const i = (y * width + x) * 4
-    if (!data[i + 3]) { transparent++; continue }
+    if (!data[i + 3] || (discardWeakSourceAlpha && data[i + 3] <= 8)) { transparent++; continue }
     // Sample unadjusted source colors. Apply this mask independently of tonal
     // controls, so brightness, inversion or detail cannot bring removals back.
     const colorAlpha=retain?retain(selectionSource[i],selectionSource[i+1],selectionSource[i+2]):1

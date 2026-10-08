@@ -216,6 +216,14 @@ test('solid alpha handles semitransparent originals with and without screening',
  }
  assert.equal(halftone(image(255,0,0,100),64,64,{...settings,enabled:false,solidAlpha:false}).data[3],100)
 })
+test('continuous solid alpha without removal ignores near-transparent export residue',()=>{
+ const data=new Uint8ClampedArray([
+  255,255,255,8,
+  255,255,255,9,
+ ])
+ const out=halftone(data,2,1,{...settings,enabled:false,background:'none',solidAlpha:true}).data
+ assert.deepEqual(Array.from(out),[0,0,0,0,255,255,255,255])
+})
 test('continuous solid alpha removes weak matte residue instead of promoting it to opaque ink',()=>{
  const data=image(255,255,255)
  data.set([20,20,20,255],0)
