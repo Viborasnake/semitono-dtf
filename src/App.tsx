@@ -192,6 +192,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const colorCorrection = useRef<{data:Uint8Array;width:number;height:number}|null>(null)
   const manualBase = useRef<{data:Uint8ClampedArray;width:number;height:number}|null>(null)
   const eraseHistory = useRef<{past:Uint8Array[];future:Uint8Array[]}>({past:[],future:[]})
+  const colorCorrectionHistory = useRef<{past:Uint8Array[];future:Uint8Array[]}>({past:[],future:[]})
   const brushing = useRef<number|null>(null)
   const colorBrushing = useRef<number|null>(null)
   const [spaceHeld, setSpaceHeld] = useState(false)
@@ -259,7 +260,9 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     if (!destination) return
     if (!keepChanges) {
       colorCorrection.current = null
+      colorCorrectionHistory.current = {past:[],future:[]}
       setColorCorrectionVersion(v => v + 1)
+      setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length,redo:(history.current?.future.length??0)+eraseHistory.current.future.length})
     }
     setColorBrushTool(false)
     setPickColorTool(false)
@@ -279,7 +282,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     const snapshot={settings,widthCm,dpi,crop,dimensions,garment:activeGarment}
     if(!history.current || historyImage.current!==imageVersion){history.current=createHistory(snapshot);historyImage.current=imageVersion}
     else history.current=recordHistory(history.current,snapshot,gesture.current)
-    setHistoryCounts({undo:history.current.past.length+eraseHistory.current.past.length,redo:history.current.future.length+eraseHistory.current.future.length})
+    setHistoryCounts({undo:history.current.past.length+eraseHistory.current.past.length+colorCorrectionHistory.current.past.length,redo:history.current.future.length+eraseHistory.current.future.length+colorCorrectionHistory.current.future.length})
   },[settings,widthCm,dpi,crop,dimensions,imageVersion,loading,activeGarment])
   useEffect(() => {
     const close = (event: PointerEvent) => {
@@ -290,6 +293,20 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   }, [])
   const navigateHistory=(direction:'undo'|'redo')=>{
     const eraseStack = eraseHistory.current
+    const colorStack = colorCorrectionHistory.current
+    const colorList = direction === 'undo' ? colorStack.past : colorStack.future
+    if (!loading && colorList.length && resultCanvas.current) {
+      const canvas = resultCanvas.current
+      const current = colorCorrection.current?.width === canvas.width && colorCorrection.current.height === canvas.height
+        ? new Uint8Array(colorCorrection.current.data) : new Uint8Array(canvas.width * canvas.height)
+      const next = colorList.pop()!
+      if (direction === 'undo') colorStack.future.push(current)
+      else colorStack.past.push(current)
+      colorCorrection.current = {data:new Uint8Array(next),width:canvas.width,height:canvas.height}
+      setColorCorrectionVersion(v=>v+1)
+      setHistoryCounts({undo:(history.current?.past.length??0)+eraseStack.past.length+colorStack.past.length,redo:(history.current?.future.length??0)+eraseStack.future.length+colorStack.future.length})
+      return
+    }
     const eraseList = direction === 'undo' ? eraseStack.past : eraseStack.future
     if (!loading && eraseList.length && resultCanvas.current && manualErase.current) {
       const current = new Uint8Array(manualErase.current.data)
@@ -298,7 +315,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       else eraseStack.past.push(current)
       manualErase.current.data = new Uint8Array(next)
       renderManualErase(resultCanvas.current)
-      setHistoryCounts({undo:(history.current?.past.length??0)+eraseStack.past.length,redo:(history.current?.future.length??0)+eraseStack.future.length})
+      setHistoryCounts({undo:(history.current?.past.length??0)+eraseStack.past.length+colorStack.past.length,redo:(history.current?.future.length??0)+eraseStack.future.length+colorStack.future.length})
       return
     }
     if(!history.current || loading)return
@@ -307,7 +324,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     history.current=next;gesture.current++
     const s=next.present
     setSettings(s.settings);setGarment(s.garment);setWidthCm(s.widthCm);setDpi(s.dpi);setCrop(s.crop);setDimensions(s.dimensions);setPreset('custom')
-    setHistoryCounts({undo:next.past.length+eraseStack.past.length,redo:next.future.length+eraseStack.future.length})
+    setHistoryCounts({undo:next.past.length+eraseStack.past.length+colorStack.past.length,redo:next.future.length+eraseStack.future.length+colorStack.future.length})
   }
 
   useEffect(() => {
@@ -382,7 +399,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       ? manualErase.current.data : new Uint8Array(canvas.width * canvas.height)
     eraseHistory.current.past.push(new Uint8Array(previous))
     eraseHistory.current.future = []
-    setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length,redo:history.current?.future.length??0})
+    setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length+colorCorrectionHistory.current.past.length,redo:(history.current?.future.length??0)+colorCorrectionHistory.current.future.length})
     e.preventDefault(); e.stopPropagation(); brushing.current = e.pointerId
     e.currentTarget.setPointerCapture(e.pointerId); eraseAt(e)
   }
@@ -398,7 +415,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const stopBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (brushing.current !== e.pointerId) return
     brushing.current = null
-    setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length,redo:(history.current?.future.length??0)+eraseHistory.current.future.length})
+    setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length+colorCorrectionHistory.current.past.length,redo:(history.current?.future.length??0)+eraseHistory.current.future.length+colorCorrectionHistory.current.future.length})
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
   }
 
@@ -418,6 +435,13 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   }
   const startColorBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!colorBrushTool || brushTool || pickColorTool || e.button !== 0 || view === 'original' || processing || exporting) return
+    const canvas = resultCanvas.current
+    if (!canvas) return
+    const previous = colorCorrection.current?.width === canvas.width && colorCorrection.current.height === canvas.height
+      ? colorCorrection.current.data : new Uint8Array(canvas.width * canvas.height)
+    colorCorrectionHistory.current.past = [...colorCorrectionHistory.current.past,new Uint8Array(previous)].slice(-50)
+    colorCorrectionHistory.current.future = []
+    setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length+colorCorrectionHistory.current.past.length,redo:(history.current?.future.length??0)+eraseHistory.current.future.length})
     e.preventDefault(); e.stopPropagation(); colorBrushing.current = e.pointerId
     e.currentTarget.setPointerCapture(e.pointerId); paintColorAt(e)
   }
@@ -425,6 +449,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const stopColorBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (colorBrushing.current !== e.pointerId) return
     colorBrushing.current = null
+    setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length+colorCorrectionHistory.current.past.length,redo:(history.current?.future.length??0)+eraseHistory.current.future.length+colorCorrectionHistory.current.future.length})
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
   }
   const pickOriginalColor = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -452,7 +477,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     manualErase.current = null
     eraseHistory.current = {past:[],future:[]}
     setBrushCursor(null)
-    setHistoryCounts({undo:history.current?.past.length??0,redo:history.current?.future.length??0})
+    setHistoryCounts({undo:(history.current?.past.length??0)+colorCorrectionHistory.current.past.length,redo:(history.current?.future.length??0)+colorCorrectionHistory.current.future.length})
     if (resultCanvas.current) renderManualErase(resultCanvas.current)
   }
   const movePan = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -482,7 +507,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const resetPanel = (panel: 'presets'|'size'|'retoque'|'background'|'trama'|'refinamiento'|'ajustes'|'edges') => {
     if (panel === 'presets') { applyPreset('default'); return }
     if (panel === 'size') { setCrop(null); setDpi(300); setWidthCm((dimensions.width / 300 * 2.54).toFixed(4)); setSettings(s => ({...s, resampleMethod: defaults.resampleMethod, sharpness: defaults.sharpness})); return }
-    if (panel === 'retoque') { setSettings(s => ({...s, flattenColor: defaults.flattenColor, flattenColorValue: defaults.flattenColorValue, flattenColorTolerance: defaults.flattenColorTolerance})); colorCorrection.current=null; setColorCorrectionVersion(v=>v+1); setPickColorTool(false); setColorBrushTool(false); return }
+    if (panel === 'retoque') { setSettings(s => ({...s, flattenColor: defaults.flattenColor, flattenColorValue: defaults.flattenColorValue, flattenColorTolerance: defaults.flattenColorTolerance})); colorCorrection.current=null;colorCorrectionHistory.current={past:[],future:[]}; setColorCorrectionVersion(v=>v+1);setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length,redo:(history.current?.future.length??0)+eraseHistory.current.future.length}); setPickColorTool(false); setColorBrushTool(false); return }
     if (panel === 'background') { setSettings(s => ({...s, background: defaults.background, colorRange: undefined, customBase: undefined, whiteRemoval: defaults.whiteRemoval, whiteCutoff: defaults.whiteCutoff, tolerance: defaults.tolerance, backgroundCleanup: defaults.backgroundCleanup})); return }
     if (panel === 'trama') { setSettings(s => ({...s, lpi: defaults.lpi, angle: defaults.angle, shape: defaults.shape, size: defaults.size, preserveColor: defaults.preserveColor, invert: defaults.invert, solidAlpha: defaults.solidAlpha, whiteDetail: defaults.whiteDetail})); return }
     if (panel === 'refinamiento') { setSettings(s => ({...s, preSmooth: defaults.preSmooth, particleMinSize: defaults.particleMinSize, minDotSize: defaults.minDotSize, protectSolid: defaults.protectSolid, protectSolidColor: defaults.protectSolidColor, protectSolidTolerance: defaults.protectSolidTolerance, protectSmoothEdge: defaults.protectSmoothEdge})); clearManualBrush(); return }
@@ -566,6 +591,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       imageRef.current = img
       manualErase.current = null
       colorCorrection.current = null
+      colorCorrectionHistory.current = {past:[],future:[]}
       setColorCorrectionVersion(v => v + 1)
       manualBase.current = null
       eraseHistory.current = {past:[],future:[]}
@@ -931,7 +957,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               {pickColorTool && <p className="help-text color-pick-hint">Selector activo: haz clic sobre el color en la imagen para tomarlo.</p>}
               <button type="button" className={`btn ${colorBrushTool ? 'active' : ''}`} onClick={() => {setColorBrushTool(v => !v);setPickColorTool(false);setBrushTool(false)}} disabled={!output || processing}>{colorBrushTool ? 'Cerrar pincel corrector' : 'Pincel corrector de color'}</button>
               {colorBrushTool && <RangeControl label="Tamaño del pincel" value={brushSize} min={4} max={120} unit=" px" onChange={setBrushSize} />}
-              {colorBrushTool && <button type="button" className="text-button" onClick={() => {colorCorrection.current=null;setColorCorrectionVersion(v=>v+1)}}>Restaurar correcciones de color</button>}
+              {colorBrushTool && <button type="button" className="text-button" onClick={() => {colorCorrection.current=null;colorCorrectionHistory.current={past:[],future:[]};setColorCorrectionVersion(v=>v+1);setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length,redo:(history.current?.future.length??0)+eraseHistory.current.future.length})}}>Restaurar correcciones de color</button>}
               {colorBrushTool && <p className="help-text">Pinta directamente con el color seleccionado. Conserva el alfa y se aplica antes del semitono y de proteger color.</p>}
               <p className="help-text">Convierte el color elegido y sus tonos cercanos en un color plano antes del semitono. Conserva el alfa original y no modifica el resto de la imagen.</p>
             </div>
