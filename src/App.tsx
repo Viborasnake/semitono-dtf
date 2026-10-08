@@ -21,6 +21,7 @@ import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleDot, Download, Era
 type Shape = 'circle' | 'square' | 'line'
 type ViewMode = 'result' | 'split' | 'original'
 type WorkflowDestination = {step: 1 | 2 | 3 | 4 | 5 | 6; panel?: 'size' | 'retoque' | 'trama' | 'refinamiento'; tool: 'design' | 'gang'}
+type PrintReviewAction = 'export' | 'resized' | 'gang'
 
 export type Settings = {
   lpi: number
@@ -202,6 +203,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [workflowStep, setWorkflowStep] = useState<1 | 2 | 3 | 4 | 5 | 6>(1)
   const [pendingWorkflowDestination, setPendingWorkflowDestination] = useState<WorkflowDestination | null>(null)
   const [gangSafetyReport,setGangSafetyReport]=useState<HalftoneSafetyReport|null>(null)
+  const [printReviewAction,setPrintReviewAction]=useState<PrintReviewAction|null>(null)
   const [preset, setPreset] = useState('default')
   const [savedPresets, setSavedPresets] = useState<SavedPreset[]>(readSavedPresets)
   const [savingPreset, setSavingPreset] = useState(false)
@@ -784,10 +786,21 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     }, 'image/png')
   }
 
-  const reviewBeforeGang = () => {
+  const reviewPrint = (action:PrintReviewAction) => {
     if (!output || readyKey !== renderKey || loading || exporting || !imageRef.current) return
-    setWorkflowStep(5)
-    setGangSafetyReport(assessHalftoneSafety({dpi,lpi:settings.lpi,size:settings.size,minDotSize:settings.minDotSize,solidAlpha:settings.solidAlpha,enabled:settings.enabled}))
+    if(action==='gang')setWorkflowStep(5)
+    setPrintReviewAction(action)
+    setGangSafetyReport(assessHalftoneSafety({dpi,sourceDpi:dimensions.width/output.widthCm*2.54,lpi:settings.lpi,size:settings.size,minDotSize:settings.minDotSize,solidAlpha:settings.solidAlpha,enabled:action==='resized'?false:settings.enabled}))
+  }
+  const reviewBeforeGang = () => reviewPrint('gang')
+  const reviewBeforeExport = () => reviewPrint('export')
+  const canOptimizeForDtf = printReviewAction !== 'resized' && (!settings.solidAlpha || (settings.enabled && settings.lpi > Math.floor(dpi / 6)))
+  const optimizeForDtf = () => {
+    setSettings(current=>({...current,solidAlpha:true,lpi:current.enabled?Math.min(current.lpi,Math.floor(dpi/6)):current.lpi}))
+    setPreset('custom');setGangSafetyReport(null)
+    const action=printReviewAction;setPrintReviewAction(null)
+    if(action==='gang')setWorkflowStep(3)
+    setExportMessage('Optimización DTF aplicada. Espera el nuevo resultado y revísalo antes de exportar.')
   }
 
   const editGangDocument = (document:EditorDocument,name:string,id:string) => {
@@ -819,8 +832,8 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <div className="export-dropdown" ref={exportMenuRef}>
               <button type="button" className="btn export export-trigger" aria-expanded={exportMenuOpen} aria-haspopup="menu" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={() => setExportMenuOpen(value => !value)}><Download size={17} /> <span>{exporting ? 'Exportando…' : 'Exportar'}</span><ChevronDown size={15} /></button>
               {exportMenuOpen && <div className="export-menu" role="menu">
-                <button type="button" role="menuitem" onClick={() => { setExportMenuOpen(false); exportPng() }}><CircleDot size={16} /><span><b>Imagen semitoneada</b><small>PNG listo para producción</small></span></button>
-                <button type="button" role="menuitem" onClick={() => { setExportMenuOpen(false); exportResizedPng() }}><ImageIcon size={16} /><span><b>Imagen reescalada</b><small>PNG ampliado sin semitono</small></span></button>
+                <button type="button" role="menuitem" onClick={() => { setExportMenuOpen(false); reviewBeforeExport() }}><CircleDot size={16} /><span><b>Imagen semitoneada</b><small>Revisar calidad antes de exportar</small></span></button>
+                <button type="button" role="menuitem" onClick={() => { setExportMenuOpen(false); reviewPrint('resized') }}><ImageIcon size={16} /><span><b>Imagen reescalada</b><small>Revisar calidad antes de exportar</small></span></button>
               </div>}
             </div>
           </>}
@@ -1087,6 +1100,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           <span className="modal-kicker">REVISIÓN PREVIA A GANG SHEET</span>
           <h2 id="halftone-safety-title">{gangSafetyReport.issues.length?'Revisa estos puntos antes de producir':'Trama lista para enviar'}</h2>
           <div className="safety-metrics" aria-label="Medidas de seguridad de la trama">
+            <span><b>{Math.round(gangSafetyReport.sourceDpi)} ppp</b>Original efectivo</span>
             <span><b>{settings.lpi} LPI</b>Frecuencia</span>
             <span><b>{gangSafetyReport.cellPixels.toFixed(1)} px</b>Por celda</span>
             <span><b>{gangSafetyReport.recommendedMinimumDotPixels} px</b>Punto mínimo sugerido</span>
@@ -1095,8 +1109,9 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           {gangSafetyReport.issues.length ? <ul className="safety-issues">{gangSafetyReport.issues.map(issue=><li key={issue.title}><b>{issue.title}</b><span>{issue.message}</span></li>)}</ul> : <p className="help-text">La resolución, frecuencia y tamaño máximo del punto cumplen la referencia de seguridad de esta revisión.</p>}
           <p className="help-text">Esta revisión detecta riesgos de resolución, tamaño y filtros. Un semitono representa los tonos más claros con transparencias, por lo que no puede garantizar un degradado sin huecos blancos; confirma siempre una prueba física y el comportamiento de tu RIP.</p>
           <div className="modal-actions">
-            <button type="button" className="btn ghost" onClick={()=>{setGangSafetyReport(null);setWorkflowStep(4)}}>Volver a ajustar</button>
-            <button type="button" className="btn export" onClick={()=>{setGangSafetyReport(null);sendToGang()}}>{gangSafetyReport.issues.length?'Enviar de todas formas':'Enviar a Gang Sheet'}</button>
+            <button type="button" className="btn ghost" onClick={()=>{const action=printReviewAction;setGangSafetyReport(null);setPrintReviewAction(null);if(action==='gang')setWorkflowStep(4)}}>Volver a ajustar</button>
+            {canOptimizeForDtf&&<button type="button" className="btn" onClick={optimizeForDtf}>Optimizar para DTF</button>}
+            <button type="button" className="btn export" onClick={()=>{const action=printReviewAction;setGangSafetyReport(null);setPrintReviewAction(null);if(action==='gang')sendToGang();else if(action==='resized')exportResizedPng();else exportPng()}}>{printReviewAction==='gang'?(gangSafetyReport.issues.length?'Enviar de todas formas':'Enviar a Gang Sheet'):printReviewAction==='resized'?'Exportar PNG reescalado':'Exportar PNG'}</button>
           </div>
         </section>
       </div>}

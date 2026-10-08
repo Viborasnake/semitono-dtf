@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {assessHalftoneSafety} from './halftone-safety.ts'
 
-const base = {dpi:300,lpi:32,size:100,minDotSize:0,solidAlpha:true,enabled:true}
+const base = {dpi:300,sourceDpi:300,lpi:32,size:100,minDotSize:0,solidAlpha:true,enabled:true}
 
 test('accepts a 300 ppp, 32 LPI solid halftone without warnings',()=>{
   const report=assessHalftoneSafety(base)
@@ -20,6 +20,11 @@ test('flags a screen whose cells are too small for the selected resolution',()=>
 test('flags a minimum-dot filter that would remove the largest screened dots',()=>{
   const report=assessHalftoneSafety({...base,lpi:65,size:45,minDotSize:2.1})
   assert.ok(report.issues.some(issue=>issue.title==='El filtro puede borrar toda la trama fina'))
+})
+
+test('flags an original that is being enlarged beyond its effective resolution',()=>{
+  const report=assessHalftoneSafety({...base,sourceDpi:150})
+  assert.ok(report.issues.some(issue=>issue.title==='El original se está ampliando'))
 })
 
 test('does not issue screening warnings for continuous output',()=>{

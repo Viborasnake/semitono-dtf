@@ -1,5 +1,6 @@
 export type HalftoneSafetyInput = {
   dpi: number
+  sourceDpi: number
   lpi: number
   size: number
   minDotSize: number
@@ -13,6 +14,7 @@ export type HalftoneSafetyIssue = {
 }
 
 export type HalftoneSafetyReport = {
+  sourceDpi: number
   cellPixels: number
   maximumDotPixels: number
   recommendedMinimumDotPixels: number
@@ -36,7 +38,14 @@ export function assessHalftoneSafety(input: HalftoneSafetyInput): HalftoneSafety
   const maxRecommendedLpi = Math.floor(input.dpi / recommendedCellPixels)
   const issues: HalftoneSafetyIssue[] = []
 
-  if (!input.enabled) return {cellPixels, maximumDotPixels, recommendedMinimumDotPixels, recommendedMinimumDotMm, maxRecommendedLpi, issues}
+  if (input.sourceDpi < input.dpi) {
+    issues.push({
+      title: 'El original se está ampliando',
+      message: `Al tamaño final el original aporta ${Math.round(input.sourceDpi)} ppp, pero la salida solicita ${input.dpi} ppp. El remuestreo permite generar el PNG, pero no recupera detalle ni mejora la definición real de impresión.`,
+    })
+  }
+
+  if (!input.enabled) return {sourceDpi:input.sourceDpi, cellPixels, maximumDotPixels, recommendedMinimumDotPixels, recommendedMinimumDotMm, maxRecommendedLpi, issues}
 
   if (cellPixels < recommendedCellPixels) {
     issues.push({
@@ -62,5 +71,5 @@ export function assessHalftoneSafety(input: HalftoneSafetyInput): HalftoneSafety
       message: 'Los bordes de los puntos conservan transparencia parcial. Para DTF, Alfa sólido ofrece una trama más predecible; valida el alfa parcial con tu RIP antes de producir.',
     })
   }
-  return {cellPixels, maximumDotPixels, recommendedMinimumDotPixels, recommendedMinimumDotMm, maxRecommendedLpi, issues}
+  return {sourceDpi:input.sourceDpi, cellPixels, maximumDotPixels, recommendedMinimumDotPixels, recommendedMinimumDotMm, maxRecommendedLpi, issues}
 }
