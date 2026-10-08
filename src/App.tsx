@@ -1087,18 +1087,36 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
                 <option value="black">Negro · oscuro</option>
               </optgroup>
               <optgroup label="Azules · claro → normal → oscuro">
-                <option value="#304b70">Azul marino · normal</option>
+                <option value="#8ecae6">Celeste · claro</option>
+                <option value="#2563eb">Azul rey · normal</option>
+                <option value="#304b70">Azul marino · oscuro</option>
                 <option value="#102a43">Azul oscuro · oscuro</option>
               </optgroup>
               <optgroup label="Verdes · claro → normal → oscuro">
+                <option value="#86efac">Verde menta · claro</option>
+                <option value="#16a34a">Verde · normal</option>
+                <option value="#166534">Verde botella · oscuro</option>
                 <option value="#808000">Verde olivo · normal</option>
                 <option value="#4b5320">Verde militar · oscuro</option>
               </optgroup>
+              <optgroup label="Morados · claro → normal → oscuro">
+                <option value="#c4b5fd">Lavanda · claro</option>
+                <option value="#7c3aed">Morado · normal</option>
+                <option value="#4c1d95">Morado oscuro · oscuro</option>
+              </optgroup>
               <optgroup label="Rojos · claro → normal → oscuro">
+                <option value="#fda4af">Rosado · claro</option>
                 <option value="#c1121f">Rojo fuerte · normal</option>
                 <option value="#7b2931">Rojo oscuro · oscuro</option>
               </optgroup>
+              <optgroup label="Amarillos y naranjas · claro → normal → oscuro">
+                <option value="#fde68a">Amarillo · claro</option>
+                <option value="#f59e0b">Mostaza · normal</option>
+                <option value="#ea580c">Naranjo · oscuro</option>
+              </optgroup>
               <optgroup label="Cafés · claro → normal → oscuro">
+                <option value="#e7d3b0">Beige · claro</option>
+                <option value="#a16207">Café · normal</option>
                 <option value="#3b2418">Café oscuro · oscuro</option>
               </optgroup>
             </select></div>
