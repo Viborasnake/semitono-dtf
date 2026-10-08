@@ -820,7 +820,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     if(action==='gang')setWorkflowStep(5)
     setPrintReviewAction(action)
     const upscaleFactor = appliedNeuralScale
-    setGangSafetyReport(assessHalftoneSafety({dpi,sourceDpi:dimensions.width/output.widthCm*2.54,upscaleFactor,lpi:settings.lpi,size:settings.size,minDotSize:settings.minDotSize,solidAlpha:settings.solidAlpha,enabled:action==='resized'?false:settings.enabled}))
+    setGangSafetyReport(assessHalftoneSafety({dpi,sourceDpi:dimensions.width/output.widthCm*2.54,upscaleFactor,neuralRequested:settings.resampleMethod==='neural2'||settings.resampleMethod==='neural4',lpi:settings.lpi,size:settings.size,minDotSize:settings.minDotSize,solidAlpha:settings.solidAlpha,enabled:action==='resized'?false:settings.enabled}))
   }
   const reviewBeforeGang = () => reviewPrint('gang')
   const reviewBeforeExport = () => reviewPrint('export')
@@ -1170,7 +1170,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           <span className="modal-kicker">REVISIÓN PREVIA A GANG SHEET</span>
           <h2 id="halftone-safety-title">{gangSafetyReport.issues.length?'Revisa estos puntos antes de producir':'Trama lista para enviar'}</h2>
           <div className="safety-metrics" aria-label="Medidas de seguridad de la trama">
-            <span><b>{Math.round(gangSafetyReport.sourceDpi)} ppp</b>{gangSafetyReport.generatedResolution ? 'Resolución Neural' : 'Original efectivo'}</span>
+            <span><b>{Math.round(gangSafetyReport.sourceDpi)} ppp</b>{gangSafetyReport.generatedResolution ? `Resolución Neural ×${appliedNeuralScale}` : 'Original efectivo'}</span>
             <span><b>{settings.lpi} LPI</b>Frecuencia</span>
             <span><b>{gangSafetyReport.cellPixels.toFixed(1)} px</b>Por celda</span>
             <span><b>{gangSafetyReport.recommendedMinimumDotPixels} px</b>Punto mínimo sugerido</span>

@@ -3,6 +3,8 @@ export type HalftoneSafetyInput = {
   sourceDpi: number
   /** Pixel-density multiplier produced before the final resize (Neural x2/x4). */
   upscaleFactor?: number
+  /** A Neural method was selected, but the model did not produce its extra pixels. */
+  neuralRequested?: boolean
   lpi: number
   size: number
   minDotSize: number
@@ -45,6 +47,13 @@ export function assessHalftoneSafety(input: HalftoneSafetyInput): HalftoneSafety
   const recommendedMinimumDotMm = recommendedMinimumDotPixels / input.dpi * 25.4
   const maxRecommendedLpi = Math.floor(input.dpi / recommendedCellPixels)
   const issues: HalftoneSafetyIssue[] = []
+
+  if (input.neuralRequested && !generatedResolution) {
+    issues.push({
+      title: 'Neural no se pudo aplicar',
+      message: 'La ampliación se procesó con Lanczos-3 como respaldo, por lo que no hay píxeles Neural adicionales para esta revisión. Esto puede ocurrir con originales de más de 4 MP o si el modelo no puede ejecutarse.',
+    })
+  }
 
   if (sourceDpi < input.dpi) {
     issues.push({

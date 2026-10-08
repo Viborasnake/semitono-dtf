@@ -34,6 +34,11 @@ test('uses Neural-generated pixels when checking available output resolution',()
   assert.ok(!report.issues.some(issue=>issue.title==='El original se está ampliando'))
 })
 
+test('explains when the selected Neural method fell back to Lanczos',()=>{
+ const report=assessHalftoneSafety({...base,sourceDpi:150,neuralRequested:true})
+ assert.ok(report.issues.some(issue=>issue.title==='Neural no se pudo aplicar'))
+})
+
 test('does not issue screening warnings for continuous output',()=>{
   assert.equal(assessHalftoneSafety({...base,enabled:false,solidAlpha:false}).issues.length,0)
 })
