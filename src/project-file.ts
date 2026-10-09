@@ -1,5 +1,6 @@
 import type {EditorDocument} from './editor-document'
 import {validColorRange} from './color-range.ts'
+import {isEdgeMaskStyle} from './edge-mask.ts'
 export type ProjectAsset={id:string;name:string;dataUrl:string;naturalWidth:number;naturalHeight:number;widthCm:number;heightCm:number;quantity:number;document?:EditorDocument}
 export type ProjectFile={format:'trama-dtf';version:1;name:string;sheet:{width:number;height:number;dpi:number;gap:number;rotate:boolean};background:string;items:ProjectAsset[];editor?:{name:string;document:EditorDocument;assetId?:string}}
 // A project embeds raster assets as PNG data URLs. Keep a generous guard against
@@ -20,6 +21,8 @@ function checkDocument(d:EditorDocument) {
   if(s.whiteRemoval!==undefined&&!['all','connected'].includes(s.whiteRemoval))fail()
   if(s.whiteDetail!==undefined&&(!Number.isFinite(s.whiteDetail)||s.whiteDetail<0||s.whiteDetail>100))fail()
   if(s.backgroundCleanup!==undefined&&(!Number.isFinite(s.backgroundCleanup)||s.backgroundCleanup<0||s.backgroundCleanup>100))fail()
+  if(s.edgeMask!==undefined&&!isEdgeMaskStyle(s.edgeMask))fail()
+  if(s.edgeMaskSizeMm!==undefined&&(!Number.isFinite(s.edgeMaskSizeMm)||s.edgeMaskSizeMm<.5||s.edgeMaskSizeMm>20))fail()
   const numeric=['lpi','angle','size','contrast','brightness','whiteCutoff','tolerance','featherMm','cornerRadiusMm','trimMm','sharpness','gamma','autoToneStrength','autoContrastStrength','temperature','tint','autoColorStrength'] as const
   const boolean=['preserveColor','invert','enabled','autoTone','autoContrast','autoColor','solidAlpha'] as const
   if(numeric.some(k=>typeof s[k]!=='number'||!Number.isFinite(s[k]))||boolean.some(k=>typeof s[k]!=='boolean')||!['circle','square','line'].includes(s.shape)||!['black','white','none','custom'].includes(s.background)||!Array.isArray(s.edgeSides)||s.edgeSides.length!==4||s.edgeSides.some(v=>typeof v!=='boolean'))fail()

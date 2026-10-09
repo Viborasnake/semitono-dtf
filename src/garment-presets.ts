@@ -2,7 +2,7 @@ import type {Settings} from './App'
 
 export type GarmentTone = 'dark' | 'light'
 export type PresetMode = 'halftone' | 'continuous'
-type PresetValues = Omit<Settings, 'featherMm' | 'cornerRadiusMm' | 'trimMm' | 'edgeSides'>
+type PresetValues = Omit<Settings, 'featherMm' | 'cornerRadiusMm' | 'trimMm' | 'edgeSides' | 'edgeMask' | 'edgeMaskSizeMm'>
 export type GarmentPreset = {label:string; description:string; garment:GarmentTone; mode:PresetMode; values:PresetValues}
 
 // Explicit processing values prevent settings from the previous category

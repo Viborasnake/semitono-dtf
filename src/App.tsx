@@ -16,6 +16,7 @@ import {assessHalftoneSafety,type HalftoneSafetyReport} from './halftone-safety'
 import CropPanel, {type CropRect} from './CropPanel'
 import ColorRangePanel from './ColorRangePanel'
 import {defaultColorRange,validColorRange,type ColorRange} from './color-range'
+import {applyEdgeMask,edgeMaskStyles,isEdgeMaskStyle,type EdgeMaskStyle} from './edge-mask'
 import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleDot, Download, Eraser, FolderOpen, Frame, Hand, Image as ImageIcon, Info, Layers3, Minus, Pipette, Plus, RotateCcw, Ruler, SlidersHorizontal, Sparkles, SwatchBook, Trash2, Upload, ZoomIn } from 'lucide-react'
 
 type Shape = 'circle' | 'square' | 'line'
@@ -45,6 +46,8 @@ export type Settings = {
   cornerRadiusMm: number
   trimMm: number
   edgeSides: boolean[]
+  edgeMask: EdgeMaskStyle
+  edgeMaskSizeMm: number
   sharpness: number
   gamma: number
   autoTone: boolean
@@ -89,6 +92,8 @@ const defaults: Settings = {
   cornerRadiusMm: 0,
   trimMm: 0,
   edgeSides: [true, true, true, true],
+  edgeMask: 'none',
+  edgeMaskSizeMm: 5,
   sharpness: 0,
   gamma: 1,
   autoTone: false,
@@ -127,7 +132,7 @@ function readSavedPresets(): SavedPreset[] {
       if (!p || typeof p.id !== 'string' || !p.id.startsWith('saved:') || typeof p.name !== 'string' || !p.name.trim() || !p.settings) return false
       const s = p.settings
       if(p.garment!==undefined&&!['dark','light'].includes(p.garment))return false
-      const ranges = {lpi:[12,65],angle:[0,90],size:[45,125],contrast:[50,180],brightness:[60,140],whiteCutoff:[170,255],tolerance:[0,100],featherMm:[0,30],trimMm:[0,15],cornerRadiusMm:[0,50],sharpness:[0,100],gamma:[.5,2],temperature:[-100,100],tint:[-100,100],autoColorStrength:[0,100],autoToneStrength:[0,100],autoContrastStrength:[0,100],preSmooth:[0,2],particleMinSize:[0,12],minDotSize:[0,2],protectSolidTolerance:[0,100],flattenColorTolerance:[0,100]}
+      const ranges = {lpi:[12,65],angle:[0,90],size:[45,125],contrast:[50,180],brightness:[60,140],whiteCutoff:[170,255],tolerance:[0,100],featherMm:[0,30],trimMm:[0,15],cornerRadiusMm:[0,50],edgeMaskSizeMm:[0.5,20],sharpness:[0,100],gamma:[.5,2],temperature:[-100,100],tint:[-100,100],autoColorStrength:[0,100],autoToneStrength:[0,100],autoContrastStrength:[0,100],preSmooth:[0,2],particleMinSize:[0,12],minDotSize:[0,2],protectSolidTolerance:[0,100],flattenColorTolerance:[0,100]}
       return Object.entries(ranges).every(([key,[min,max]]) => Number.isFinite(s[key]) && s[key] >= min && s[key] <= max)
         && ['circle','square','line'].includes(s.shape) && ['black','white','none','custom'].includes(s.background)
         && (s.colorRange===undefined||validColorRange(s.colorRange))
@@ -141,6 +146,7 @@ function readSavedPresets(): SavedPreset[] {
         && typeof s.flattenColor === 'boolean' && typeof s.flattenColorValue === 'string' && /^#[0-9a-f]{6}$/i.test(s.flattenColorValue)
         && ['autoTone','autoContrast','autoColor','solidAlpha'].every(key => s[key] === undefined || typeof s[key] === 'boolean')
         && Array.isArray(s.edgeSides) && s.edgeSides.length === 4 && s.edgeSides.every((v:unknown) => typeof v === 'boolean')
+        && isEdgeMaskStyle(s.edgeMask)
     }).map(p=>({...p,settings:{...defaults,...p.settings}}))
   } catch {return []}
 }
@@ -157,6 +163,19 @@ function RangeControl({ label, value, min, max, step = 1, unit = '', onChange }:
 
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return <button type="button" className={`toggle ${checked ? 'on' : ''}`} aria-pressed={checked} onClick={() => onChange(!checked)}><span /></button>
+}
+
+function EdgeMaskThumbnail({style}:{style:EdgeMaskStyle}) {
+  const ref=useRef<HTMLCanvasElement>(null)
+  useEffect(()=>{
+    const canvas=ref.current,ctx=canvas?.getContext('2d')
+    if(!canvas||!ctx)return
+    const image=ctx.createImageData(canvas.width,canvas.height)
+    for(let i=0;i<image.data.length;i+=4)image.data.set([40,224,190,255],i)
+    applyEdgeMask(image.data,canvas.width,canvas.height,{style,sizeMm:2.5,dpi:150,solidAlpha:true})
+    ctx.putImageData(image,0,0)
+  },[style])
+  return <canvas ref={ref} width={80} height={56} aria-hidden="true"/>
 }
 
 function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>void;initialProject:ProjectFile;resetting?:boolean}) {
@@ -512,7 +531,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     if (panel === 'trama') { setSettings(s => ({...s, lpi: defaults.lpi, angle: defaults.angle, shape: defaults.shape, size: defaults.size, preserveColor: defaults.preserveColor, invert: defaults.invert, solidAlpha: defaults.solidAlpha, whiteDetail: defaults.whiteDetail})); return }
     if (panel === 'refinamiento') { setSettings(s => ({...s, preSmooth: defaults.preSmooth, particleMinSize: defaults.particleMinSize, minDotSize: defaults.minDotSize, protectSolid: defaults.protectSolid, protectSolidColor: defaults.protectSolidColor, protectSolidTolerance: defaults.protectSolidTolerance, protectSmoothEdge: defaults.protectSmoothEdge})); clearManualBrush(); return }
     if (panel === 'ajustes') { setSettings(s => ({...s, contrast: defaults.contrast, brightness: defaults.brightness, gamma: defaults.gamma, temperature: defaults.temperature, tint: defaults.tint, autoTone: defaults.autoTone, autoContrast: defaults.autoContrast, autoColor: defaults.autoColor, autoToneStrength: defaults.autoToneStrength, autoContrastStrength: defaults.autoContrastStrength, autoColorStrength: defaults.autoColorStrength})); return }
-    setSettings(s => ({...s, featherMm: defaults.featherMm, trimMm: defaults.trimMm, cornerRadiusMm: defaults.cornerRadiusMm, edgeSides: [...defaults.edgeSides]}))
+    setSettings(s => ({...s, featherMm: defaults.featherMm, trimMm: defaults.trimMm, cornerRadiusMm: defaults.cornerRadiusMm, edgeSides: [...defaults.edgeSides],edgeMask:defaults.edgeMask,edgeMaskSizeMm:defaults.edgeMaskSizeMm}))
   }
 
   const applyPreset = (key:string) => {
@@ -1053,14 +1072,16 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             </div>
           </section>
 
-          <section className={`control-card ${collapsedPanels.edges ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.edges} aria-controls="edge-controls" onClick={()=>togglePanel('edges')}><span><Frame size={17} /> Suavizar bordes</span><ChevronDown size={17}/></button><div className="section-body" id="edge-controls" hidden={collapsedPanels.edges}>
+          <section className={`control-card ${collapsedPanels.edges ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.edges} aria-controls="edge-controls" onClick={()=>togglePanel('edges')}><span><Frame size={17} /> Bordes y máscaras</span><ChevronDown size={17}/></button><div className="section-body" id="edge-controls" hidden={collapsedPanels.edges}>
             <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('edges')}>Restablecer valores</button>
-            <button className="text-button" onClick={() => setSettings(s => ({...s, featherMm: 0, trimMm: 0, cornerRadiusMm: 0, edgeSides: [true,true,true,true]}))}>Reiniciar bordes</button>
+            <button className="text-button" onClick={() => setSettings(s => ({...s, featherMm: 0, trimMm: 0, cornerRadiusMm: 0, edgeSides: [true,true,true,true],edgeMask:'none',edgeMaskSizeMm:5}))}>Reiniciar bordes</button>
+            <div className="field"><span>Máscaras de borde</span><div className="edge-mask-grid" role="group" aria-label="Máscaras de borde"><button type="button" aria-pressed={settings.edgeMask==='none'} onClick={()=>update('edgeMask','none')}><EdgeMaskThumbnail style="none"/><span>Sin máscara</span></button>{edgeMaskStyles.map(style=><button key={style.id} type="button" aria-pressed={settings.edgeMask===style.id} onClick={()=>update('edgeMask',style.id)}><EdgeMaskThumbnail style={style.id}/><span>{style.name}</span></button>)}</div></div>
+            {settings.edgeMask!=='none'&&<RangeControl label="Profundidad de máscara" value={settings.edgeMaskSizeMm} min={0.5} max={20} step={0.5} unit=" mm" onChange={v=>update('edgeMaskSizeMm',v)}/>}
             <RangeControl label="Borrar margen" value={settings.trimMm} min={0} max={15} step={0.5} unit=" mm" onChange={v => update('trimMm', v)} />
             <RangeControl label="Desvanecido hacia dentro" value={settings.featherMm} min={0} max={30} step={0.5} unit=" mm" onChange={v => update('featherMm', v)} />
             <RangeControl label="Radio de esquinas" value={settings.cornerRadiusMm} min={0} max={50} step={0.5} unit=" mm" onChange={v => update('cornerRadiusMm', v)} />
             <div className="edge-sides">{['Arriba', 'Derecha', 'Abajo', 'Izquierda'].map((label, index) => <label key={label}><input type="checkbox" checked={settings.edgeSides[index]} onChange={e => update('edgeSides', settings.edgeSides.map((v, i) => i === index ? e.target.checked : v))} />{label}</label>)}</div>
-            <p className="help-text">Borra el contorno rectangular, suaviza los lados y permite redondear las cuatro esquinas. El tamaño del lienzo se conserva.</p>
+            <p className="help-text">Las máscaras recortan el borde visible del diseño y se combinan con la trama, el desvanecido y los lados seleccionados. El tamaño del lienzo se conserva.</p>
           </div></section>
           <div className="tip-card"><div><Check size={14} /> {processing ? 'ACTUALIZANDO…' : `${transparent}% TRANSPARENTE`}</div><p>{settings.background==='custom'?'Se quitan los colores muestreados en toda la imagen. Puedes revisar o modificar la selección con el gotero.':settings.background === 'black' ? 'El negro lo aporta la prenda. Se eliminan los tonos oscuros del diseño completo.' : settings.background === 'white' ? settings.whiteRemoval==='connected'?'Se quita el fondo claro conectado al borde; se conservan los detalles interiores.':'Se eliminan los blancos del diseño completo.' : settings.enabled?'Se conserva el color y se perfora con la trama.':'Se conserva la imagen sin generar puntos.'} El fondo de vista previa no se exporta.</p></div>
           {error && <p className="error-text" role="alert">{error}</p>}
