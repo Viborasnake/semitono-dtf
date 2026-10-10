@@ -46,6 +46,17 @@ export function applyColorCorrection(data: Uint8ClampedArray, mask: Uint8Array, 
   return out
 }
 
+/** Restores protected ink after dot cleanup while respecting the output alpha mode. */
+export function restoreProtectedPixels(output: Uint8ClampedArray, colors: Uint8ClampedArray, source: Uint8ClampedArray, mask: Uint8Array, solidAlpha: boolean, smoothEdge: boolean) {
+  for (let p = 0; p < mask.length; p++) if (mask[p]) {
+    const i = p * 4
+    output[i] = colors[i]
+    output[i + 1] = colors[i + 1]
+    output[i + 2] = colors[i + 2]
+    output[i + 3] = source[i + 3] === 0 ? 0 : solidAlpha || !smoothEdge ? 255 : source[i + 3]
+  }
+}
+
 /** Removes connected alpha islands smaller than the requested pixel area. */
 export function removeSmallParticles(data: Uint8ClampedArray, width: number, height: number, minArea: number) {
   const threshold = Math.max(0, Math.floor(minArea))

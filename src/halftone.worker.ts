@@ -2,7 +2,7 @@ import { halftone } from './halftone'
 import { resizeRgba, sharpenRgba } from './resample'
 import { autoAdjust } from './auto-adjust'
 import { neuralUpscaleRgba } from './neural-upscale'
-import { applyColorCorrection, flattenSelectedColor, removeSmallParticles, removeTinyDots, smoothRgba } from './refine'
+import { applyColorCorrection, flattenSelectedColor, removeSmallParticles, removeTinyDots, restoreProtectedPixels, smoothRgba } from './refine'
 import { applyEdgeMask } from './edge-mask'
 
 self.onmessage = async (event) => {
@@ -43,13 +43,7 @@ self.onmessage = async (event) => {
     }
     removeTinyDots(result.data, width, height, settings.minDotSize ?? 0)
     removeSmallParticles(result.data, width, height, settings.particleMinSize ?? 0)
-    for (let p = 0; p < result.protectedMask.length; p++) if (result.protectedMask[p]) {
-      const i = p * 4
-      result.data[i] = flattened[i]
-      result.data[i + 1] = flattened[i + 1]
-      result.data[i + 2] = flattened[i + 2]
-      result.data[i + 3] = settings.protectSmoothEdge === false ? 255 : resized[i + 3]
-    }
+    restoreProtectedPixels(result.data, flattened, resized, result.protectedMask, settings.solidAlpha, settings.protectSmoothEdge !== false)
     applyEdgeMask(result.data, width, height, {style:settings.edgeMask ?? 'none',sizeMm:settings.edgeMaskSizeMm ?? 5,dpi:settings.dpi,sides:settings.edgeSides,solidAlpha:settings.solidAlpha})
     result.transparent = Math.round(result.data.reduce((count: number, _, index: number) => index % 4 === 3 && result.data[index] === 0 ? count + 1 : count, 0) / (width * height) * 100)
     progress(96)

@@ -1044,7 +1044,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
                 <div className="solid-protection-presets"><button type="button" onClick={() => {update('protectSolidColor','#ffffff');update('protectSolidTolerance',30);update('protectSolid',true)}}>Proteger blancos</button><button type="button" onClick={() => {update('protectSolidColor','#000000');update('protectSolidTolerance',20);update('protectSolid',true)}}>Proteger negros</button></div>
                 <RangeControl label="Tolerancia de color" value={settings.protectSolidTolerance} min={0} max={40} unit="%" onChange={v => update('protectSolidTolerance', v)} />
                 <div className="row-label"><span>Conservar borde suave</span><Toggle checked={settings.protectSmoothEdge} onChange={v => update('protectSmoothEdge', v)} /></div>
-                <p className="help-text">El color elegido y sus tonos cercanos quedan sólidos y fuera del semitono. Recomendado para logos, tipografías y brillos. No protege colores que el fondo seleccionado ya elimina.</p>
+                <p className="help-text">El color elegido y sus tonos cercanos quedan fuera del semitono. Con Alfa sólido (DTF), sus bordes también son opacos; Conservar borde suave se aplica cuando Alfa sólido está desactivado. No protege colores que el fondo seleccionado ya elimina.</p>
               </>}
             </div>
           </section>
