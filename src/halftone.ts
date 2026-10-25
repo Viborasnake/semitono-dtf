@@ -1,5 +1,5 @@
 import {connectedWhiteBackground} from './white-background.ts'
-import {colorRangeRetention,defaultColorRange,type ColorRange} from './color-range.ts'
+import {colorRangeRetention,defaultColorRange,selectionBrushMask,selectionCoverage,type ColorRange} from './color-range.ts'
 export type HalftoneSettings = {
   lpi: number; angle: number; shape: 'circle' | 'square' | 'line'; size: number
   contrast: number; brightness: number; whiteCutoff: number
@@ -34,6 +34,8 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
   const retain=s.background==='custom'?colorRangeRetention(s.colorRange??defaultColorRange):null
   const affected=s.affectedColors?colorRangeRetention(s.affectedColors):null
   const protectedColors=s.protectedColors?colorRangeRetention(s.protectedColors):null
+  const affectedBrush=s.affectedColors?selectionBrushMask(s.affectedColors,width,height):null
+  const protectedBrush=s.protectedColors?selectionBrushMask(s.protectedColors,width,height):null
   // A custom range is a removal mask layered over the normal black/white
   // screening path selected before sampling. It is not a third screening mode.
   const processingBackground=s.background==='custom'?(s.customBase??'white'):s.background
@@ -170,8 +172,8 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
     const removed = coverage === 0 && s.background !== 'none'
     if (removed) { transparent++; continue }
     const retainedCoverage=coverage*data[i+3]/255*edgeAlpha*colorAlpha
-    const selectionAmount=affected?1-affected(selectionSource[i],selectionSource[i+1],selectionSource[i+2]):1
-    const protectionAmount=protectedColors?1-protectedColors(selectionSource[i],selectionSource[i+1],selectionSource[i+2]):0
+    const selectionAmount=affected?selectionCoverage(s.affectedColors!,affected(selectionSource[i],selectionSource[i+1],selectionSource[i+2]),affectedBrush?.[y*width+x]):1
+    const protectionAmount=protectedColors?selectionCoverage(s.protectedColors!,protectedColors(selectionSource[i],selectionSource[i+1],selectionSource[i+2]),protectedBrush?.[y*width+x]):0
     const screenAmount=selectionAmount*(1-protectionAmount)
     coverage = clamp((coverage - .5) * s.contrast / 100 + .5 + (s.brightness - 100) / 100)
     if (s.invert) coverage = 1 - coverage
