@@ -15,6 +15,9 @@ const previewBackgrounds=['checker','black','white','#596778','#8ecae6','#2563eb
 function checkDocument(d:EditorDocument) {
   if(!d||d.version!==1||!png(d.original)||!positive(d.widthCm)||![150,300,600].includes(d.dpi)||!d.settings)fail()
   const s=d.settings
+  if(s.affectedColors!==undefined&&!validColorRange(s.affectedColors))fail()
+  if(s.protectedColors!==undefined&&!validColorRange(s.protectedColors))fail()
+  if(s.organic!==undefined&&(!Number.isFinite(s.organic)||s.organic<0||s.organic>100))fail()
   if((s.colorRange!==undefined&&!validColorRange(s.colorRange))||(s.background==='custom'&&!validColorRange(s.colorRange)))fail()
   if(s.customBase!==undefined&&!['black','white'].includes(s.customBase))fail()
   if(d.garment!==undefined&&!['dark','light'].includes(d.garment))fail()

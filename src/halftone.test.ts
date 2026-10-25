@@ -9,6 +9,24 @@ function image(r: number, g: number, b: number, a = 255) {
   for (let i = 0; i < data.length; i += 4) data.set([r, g, b, a], i)
   return data
 }
+test('screen selection and protection preserve solid colors and never restore removed background',()=>{
+  const data=image(128,64,32)
+  const selected={colors:['#804020'],tolerance:0,softness:0}
+  const base={...settings,background:'none' as const,affectedColors:selected,organic:65}
+  assert.ok(halftone(data,64,64,base).transparent>0)
+  assert.deepEqual(halftone(data,64,64,{...base,protectedColors:selected}).data,data)
+  assert.deepEqual(halftone(data,64,64,{...base,affectedColors:{...selected,colors:['#ffffff']}}).data,data)
+  assert.equal(halftone(data,64,64,{...base,background:'custom',colorRange:selected,protectedColors:selected}).transparent,100)
+})
+test('organic dots are deterministic and keep comparable coverage and solid endpoints',()=>{
+  const data=image(128,128,128)
+  const regular=halftone(data,64,64,settings)
+  const organic=halftone(data,64,64,{...settings,organic:100})
+  assert.notDeepEqual(regular.data,organic.data)
+  assert.deepEqual(organic.data,halftone(data,64,64,{...settings,organic:100}).data)
+  assert.ok(Math.abs(regular.transparent-organic.transparent)<5)
+  for(const shape of ['circle','square','line'] as const)assert.equal(halftone(image(255,255,255),64,64,{...settings,organic:100,shape}).transparent,0)
+})
 test('black and near-black backgrounds are truly transparent', () => {
   for (const tone of [0, 12, 25]) {
     const result = halftone(image(tone, tone, tone), 64, 64, settings)

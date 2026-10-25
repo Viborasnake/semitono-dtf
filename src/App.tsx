@@ -45,6 +45,9 @@ export type Settings = {
   tolerance: number
   enabled: boolean
   screenScope: 'transitions' | 'all'
+  affectedColors?: ColorRange
+  protectedColors?: ColorRange
+  organic?: number
   featherMm: number
   cornerRadiusMm: number
   trimMm: number
@@ -241,6 +244,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [showInfo, setShowInfo] = useState(false)
   const [showColorRange,setShowColorRange]=useState(false)
   const [isolatedColorPick,setIsolatedColorPick]=useState(false)
+  const [tramaColorPick,setTramaColorPick]=useState<'affected'|'protected'|null>(null)
   const [cropMessage,setCropMessage]=useState('')
   const [gangSource, setGangSource] = useState<GangSource>()
   const [editingAssetId,setEditingAssetId]=useState<string>()
@@ -536,7 +540,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     if (panel === 'size') { setCrop(null); setDpi(300); setWidthCm((dimensions.width / 300 * 2.54).toFixed(4)); setSettings(s => ({...s, resampleMethod: defaults.resampleMethod, sharpness: defaults.sharpness})); return }
     if (panel === 'retoque') { setSettings(s => ({...s, flattenColor: defaults.flattenColor, flattenColorValue: defaults.flattenColorValue, flattenColorTolerance: defaults.flattenColorTolerance})); colorCorrection.current=null;colorCorrectionHistory.current={past:[],future:[]}; setColorCorrectionVersion(v=>v+1);setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length,redo:(history.current?.future.length??0)+eraseHistory.current.future.length}); setPickColorTool(false); setColorBrushTool(false); return }
     if (panel === 'background') { setSettings(s => ({...s, background: defaults.background, colorRange: undefined, customBase: undefined, whiteRemoval: defaults.whiteRemoval, whiteCutoff: defaults.whiteCutoff, tolerance: defaults.tolerance, backgroundCleanup: defaults.backgroundCleanup})); return }
-    if (panel === 'trama') { setSettings(s => ({...s, screenScope: defaults.screenScope, lpi: defaults.lpi, angle: defaults.angle, shape: defaults.shape, size: defaults.size, preserveColor: defaults.preserveColor, invert: defaults.invert, solidAlpha: defaults.solidAlpha, whiteDetail: defaults.whiteDetail})); return }
+    if (panel === 'trama') { setSettings(s => ({...s, affectedColors:undefined,protectedColors:undefined,organic:0,screenScope: defaults.screenScope, lpi: defaults.lpi, angle: defaults.angle, shape: defaults.shape, size: defaults.size, preserveColor: defaults.preserveColor, invert: defaults.invert, solidAlpha: defaults.solidAlpha, whiteDetail: defaults.whiteDetail})); return }
     if (panel === 'refinamiento') { setSettings(s => ({...s, preSmooth: defaults.preSmooth, particleMinSize: defaults.particleMinSize, minDotSize: defaults.minDotSize, protectSolid: defaults.protectSolid, protectSolidColor: defaults.protectSolidColor, protectSolidTolerance: defaults.protectSolidTolerance, protectSmoothEdge: defaults.protectSmoothEdge})); clearManualBrush(); return }
     if (panel === 'ajustes') { setSettings(s => ({...s, contrast: defaults.contrast, brightness: defaults.brightness, gamma: defaults.gamma, temperature: defaults.temperature, tint: defaults.tint, autoTone: defaults.autoTone, autoContrast: defaults.autoContrast, autoColor: defaults.autoColor, autoToneStrength: defaults.autoToneStrength, autoContrastStrength: defaults.autoContrastStrength, autoColorStrength: defaults.autoColorStrength})); return }
     setSettings(s => ({...s, featherMm: defaults.featherMm, trimMm: defaults.trimMm, cornerRadiusMm: defaults.cornerRadiusMm, edgeSides: [...defaults.edgeSides],edgeMask:defaults.edgeMask,edgeMaskSizeMm:defaults.edgeMaskSizeMm}))
@@ -560,11 +564,6 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     setView('result')
   }
   const chooseScreenScope = (scope:Settings['screenScope']) => {
-    if (scope === 'transitions' && settings.background !== 'custom') {
-      setIsolatedColorPick(true)
-      setShowColorRange(true)
-      return
-    }
     setIsolatedColorPick(false)
     update('screenScope', scope)
     setView('result')
@@ -905,7 +904,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   return (
     <div className="app-shell" inert={resetting} onPointerDownCapture={()=>{gesture.current++}} onKeyDownCapture={e=>{
       if(!e.repeat)gesture.current++
-      if(tool!=='design' || showCrop || showColorRange || !(e.metaKey||e.ctrlKey))return
+      if(tool!=='design' || showCrop || showColorRange || tramaColorPick || !(e.metaKey||e.ctrlKey))return
       if(e.target instanceof Element && e.target.closest('input,textarea,select,[contenteditable=true]'))return
       if(e.key.toLowerCase()==='z'){e.preventDefault();navigateHistory(e.shiftKey?'redo':'undo')}
       else if(e.key.toLowerCase()==='y'){e.preventDefault();navigateHistory('redo')}
@@ -1037,9 +1036,16 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               <div className="preset-group"><span className="preset-group-label">Acabado</span><div className="segmented preset-segments" role="group" aria-label="Acabado">{([['halftone','Semitono'],['continuous','Sin semitono']] as const).map(([mode,label])=><button key={mode} type="button" className={presetMode===mode?'active':''} aria-pressed={presetMode===mode} onClick={()=>choosePresetMode(mode)}>{label}</button>)}</div></div>
               {settings.enabled ? <>
               <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('trama')}>Restablecer valores</button>
-              <div className="preset-group"><span className="preset-group-label">Aplicar semitono sobre</span><div className="segmented preset-segments" role="group" aria-label="Alcance del semitono"><button type="button" className={settings.screenScope==='transitions'?'active':''} aria-pressed={settings.screenScope==='transitions'} onClick={()=>chooseScreenScope('transitions')}>Aislado</button><button type="button" className={settings.screenScope==='all'?'active':''} aria-pressed={settings.screenScope==='all'} onClick={()=>chooseScreenScope('all')}>Diseño completo</button></div></div>
-              <p className="help-text">Aislado abre el gotero para elegir el color del sustrato que se restará. Conserva intacto el diseño sólido y convierte en puntos sólo la transición creada por la tolerancia y suavidad. Diseño completo aplica la trama tonal a toda la imagen restante.</p>
-              {settings.screenScope==='transitions'&&settings.background==='custom'&&<p className="help-text success-inline">Aislado activo · sustrato seleccionado: {settings.colorRange?.colors.join(', ')}.</p>}
+              <div className="preset-group"><span className="preset-group-label">Control de trama</span>
+                <label className="field">Origen del degradado<select value={settings.screenScope} onChange={e=>chooseScreenScope(e.target.value as Settings['screenScope'])}><option value="all">Tonos de la imagen</option><option value="transitions">Transparencias y transición del fondo</option></select></label>
+                <button className="btn color-range-trigger" onClick={()=>setTramaColorPick('affected')}><Pipette size={16}/> Colores afectados · {settings.affectedColors?'Editar selección':'Todos'}</button>
+                {settings.affectedColors&&<><p className="help-text">Con trama: {settings.affectedColors.colors.join(', ')}. Los demás colores quedan sólidos.</p><button className="text-button" onClick={()=>update('affectedColors',undefined)}>Afectar todos los colores</button></>}
+                <button className="btn color-range-trigger" onClick={()=>setTramaColorPick('protected')}><Pipette size={16}/> Colores protegidos · {settings.protectedColors?'Editar selección':'Sin selección'}</button>
+                {settings.protectedColors&&<><p className="help-text">Sin trama: {settings.protectedColors.colors.join(', ')}. La protección tiene prioridad.</p><button className="text-button" onClick={()=>update('protectedColors',undefined)}>Quitar protección de trama</button></>}
+              </div>
+              <p className="help-text">Selecciona varias muestras con el gotero y ajusta tolerancia y suavidad en la máscara. La selección afecta todas las zonas del mismo color. El fondo eliminado permanece transparente.</p>
+              <RangeControl label="Irregularidad de los puntos" value={settings.organic??0} min={0} max={100} unit="%" onChange={v=>update('organic',v)}/>
+              <p className="help-text">0%: trama regular. Aumenta para desplazar suavemente los puntos y reducir la apariencia de rejilla. Revisa los detalles al 100%.</p>
               <RangeControl label="Frecuencia" value={settings.lpi} min={12} max={65} unit=" LPI" onChange={(v) => update('lpi', v)} />
               <RangeControl label="Ángulo" value={settings.angle} min={0} max={90} step={0.5} unit="°" onChange={(v) => update('angle', v)} />
               <div className="field"><span>Forma del punto</span><div className="segmented shapes">
@@ -1267,6 +1273,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
         </section>
       </div>}
       {showCrop && imageRef.current && <CropPanel image={imageRef.current} initial={crop ?? {x:0,y:0,width:dimensions.width,height:dimensions.height}} onCancel={()=>setShowCrop(false)} onApply={rect=>{setWidthCm((Number(widthCm)*rect.width/dimensions.width).toFixed(4));setDimensions({width:rect.width,height:rect.height});setCrop(rect);setShowCrop(false);setFit(true)}}/>}
+      {tramaColorPick&&imageRef.current&&<ColorRangePanel purpose={tramaColorPick} image={imageRef.current} crop={crop} initial={(tramaColorPick==='affected'?settings.affectedColors:settings.protectedColors)??defaultColorRange} onCancel={()=>setTramaColorPick(null)} onApply={range=>{update(tramaColorPick==='affected'?'affectedColors':'protectedColors',range);setComparisonTarget('result');setView('result');setTramaColorPick(null)}}/>}
       {showColorRange&&imageRef.current&&<ColorRangePanel purpose={isolatedColorPick?'isolated':'background'} image={imageRef.current} crop={crop} initial={settings.colorRange??{...defaultColorRange,colors:[settings.background==='black'?'#000000':'#ffffff']}} onCancel={()=>{setShowColorRange(false);setIsolatedColorPick(false)}} onApply={colorRange=>{const base=settings.background==='black'||settings.background==='white'?settings.background:activeGarment==='dark'?'black':'white';setGarment(activeGarment);setSettings(s=>({...s,background:'custom',customBase:base,colorRange,preserveColor:true,...(isolatedColorPick?{screenScope:'transitions' as const}:{})}));setPreset('custom');setView('result');setShowColorRange(false);setIsolatedColorPick(false)}}/>}
     </div>
   )

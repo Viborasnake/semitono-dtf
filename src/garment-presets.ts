@@ -8,6 +8,7 @@ export type GarmentPreset = {label:string; description:string; garment:GarmentTo
 // Explicit processing values prevent settings from the previous category
 // leaking into the next one. Physical dimensions, DPI, crop and edges stay put.
 const neutral:PresetValues = {
+  affectedColors:undefined,protectedColors:undefined,organic:0,
   lpi:32,angle:22.5,shape:'circle',size:100,contrast:100,brightness:100,
   whiteCutoff:255,preserveColor:true,invert:false,background:'black',
   whiteRemoval:'all',whiteDetail:0,backgroundCleanup:0,tolerance:0,enabled:true,screenScope:'all',sharpness:0,

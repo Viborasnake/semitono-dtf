@@ -3,7 +3,8 @@ import {Pipette,Plus,X} from 'lucide-react'
 import {colorRangeRetention,type ColorRange} from './color-range'
 import type {CropRect} from './CropPanel'
 
-export default function ColorRangePanel({image,crop,initial,onApply,onCancel,purpose='background'}:{image:HTMLImageElement;crop:CropRect|null;initial:ColorRange;onApply:(value:ColorRange)=>void;onCancel:()=>void;purpose?:'background'|'isolated'}) {
+export default function ColorRangePanel({image,crop,initial,onApply,onCancel,purpose='background'}:{image:HTMLImageElement;crop:CropRect|null;initial:ColorRange;onApply:(value:ColorRange)=>void;onCancel:()=>void;purpose?:'background'|'isolated'|'affected'|'protected'}) {
+  const screening=purpose==='affected'||purpose==='protected'
   const [range,setRange]=useState<ColorRange>(()=>structuredClone(initial))
   const [add,setAdd]=useState(false),[selection,setSelection]=useState(true),[message,setMessage]=useState(''),[sourceZoom,setSourceZoom]=useState(1)
   const source=useRef<HTMLCanvasElement>(null),preview=useRef<HTMLCanvasElement>(null),dialog=useRef<HTMLElement>(null)
@@ -26,10 +27,10 @@ export default function ColorRangePanel({image,crop,initial,onApply,onCancel,pur
     for(let i=0;i<pixels.data.length;i+=4){
       const alpha=pixels.data[i+3]/255,kept=retain(pixels.data[i],pixels.data[i+1],pixels.data[i+2])
       if(selection){const removed=(1-kept)*alpha*255;pixels.data[i]=pixels.data[i+1]=pixels.data[i+2]=removed;pixels.data[i+3]=255}
-      else pixels.data[i+3]*=kept
+      else pixels.data[i+3]*=screening?1-kept:kept
     }
     target.getContext('2d')!.putImageData(pixels,0,0)
-  },[image,region.x,region.y,region.width,region.height,width,height,range,selection])
+  },[image,region.x,region.y,region.width,region.height,width,height,range,selection,screening])
   function sample(e:React.MouseEvent<HTMLCanvasElement>){
     const box=e.currentTarget.getBoundingClientRect()
     const x=region.x+Math.min(region.width-1,Math.max(0,Math.floor((e.clientX-box.left)/box.width*region.width)))
@@ -51,17 +52,18 @@ export default function ColorRangePanel({image,crop,initial,onApply,onCancel,pur
       else if(!e.shiftKey&&(document.activeElement===last||document.activeElement===dialog.current)){e.preventDefault();first?.focus()}
     }
   }}>
-    <header><h2 id="color-range-title">{purpose==='isolated'?'Color del sustrato':'Rango de color'}</h2><button className="btn" aria-label="Cerrar rango de color" onClick={onCancel}><X size={18}/></button></header>
-    <p className="help-text">{purpose==='isolated'?'Elige con el gotero el color de la prenda o sustrato que quieres restar. El semitono aislado actuará únicamente en la transición creada por la tolerancia y la suavidad; el diseño sólido permanecerá intacto.':'Haz clic en el original para elegir el color que quieres quitar. Las muestras se toman antes de las correcciones de imagen.'}</p>
+    <header><h2 id="color-range-title">{screening?(purpose==='affected'?'Colores con trama':'Colores protegidos'):purpose==='isolated'?'Color del sustrato':'Rango de color'}</h2><button className="btn" aria-label="Cerrar rango de color" onClick={onCancel}><X size={18}/></button></header>
+    {screening&&<p className="help-text">Elige muestras en el original. En la máscara, blanco = seleccionado, negro = fuera de la selección y gris = transición. Esta selección {purpose==='affected'?'limita dónde aparece la trama':'conserva las zonas seleccionadas sin trama'}.</p>}
+    {!screening&&<p className="help-text">{purpose==='isolated'?'Elige con el gotero el color de la prenda o sustrato que quieres restar. El semitono aislado actuará únicamente en la transición creada por la tolerancia y la suavidad; el diseño sólido permanecerá intacto.':'Haz clic en el original para elegir el color que quieres quitar. Las muestras se toman antes de las correcciones de imagen.'}</p>}
     <div className="range-toolbar"><div className="segmented" aria-label="Modo de muestreo"><button className={!add?'active':''} aria-pressed={!add} onClick={()=>setAdd(false)}><Pipette size={16}/> Reemplazar muestra</button><button className={add?'active':''} aria-pressed={add} onClick={()=>setAdd(true)}><Plus size={16}/> Añadir muestra</button></div><label className="field">Vista previa<select value={selection?'mask':'image'} onChange={e=>setSelection(e.target.value==='mask')}><option value="mask">Selección</option><option value="image">Imagen recortada</option></select></label></div>
     <div className="range-preview-grid">
       <figure><div className="range-figure-head"><figcaption>Original <span>· haz clic para usar el gotero</span></figcaption><div className="range-zoom" aria-label="Zoom del gotero"><span>Zoom</span><button className="btn" disabled={sourceZoom===1} onClick={()=>setSourceZoom(z=>Math.max(1,z/2))} aria-label="Alejar el gotero">−</button><output>{sourceZoom}×</output><button className="btn" disabled={sourceZoom===8} onClick={()=>setSourceZoom(z=>Math.min(8,z*2))} aria-label="Acercar el gotero">+</button><button className="btn" disabled={sourceZoom===1} onClick={()=>setSourceZoom(1)}>Ajustar</button></div></div><div className="range-canvas-wrap range-source-wrap"><canvas ref={source} className="range-source-canvas" style={{width:`${width*sourceZoom}px`,height:`${height*sourceZoom}px`}} onClick={sample} aria-label="Imagen original para muestrear color"/></div></figure>
-      <figure><div className="range-figure-head"><figcaption>{selection?'Selección':'Imagen recortada'} <span>· blanco = quitar, negro = conservar</span></figcaption></div><div className="range-canvas-wrap"><canvas ref={preview}/></div></figure>
+      <figure><div className="range-figure-head"><figcaption>{selection?'Selección':'Imagen recortada'} <span>{screening?'· blanco = seleccionado, negro = fuera':'· blanco = quitar, negro = conservar'}</span></figcaption></div><div className="range-canvas-wrap"><canvas ref={preview}/></div></figure>
     </div>
     <div className="range-swatches">{range.colors.map((color,i)=><div key={i}><input type="color" aria-label={`Color a quitar ${i+1}`} value={color} onChange={e=>setRange(r=>({...r,colors:r.colors.map((c,j)=>j===i?e.target.value:c)}))}/><span>{color.toUpperCase()}</span><button className="btn" disabled={range.colors.length===1} aria-label={`Quitar muestra ${i+1}`} onClick={()=>setRange(r=>({...r,colors:r.colors.filter((_,j)=>j!==i)}))}><X size={14}/></button></div>)}</div>
     <div className="dimension-fields">{(['tolerance','softness'] as const).map((key,i)=><label className="range-control" key={key}><span><b>{i?'Suavidad del rango':'Tolerancia de color'}</b><output>{range[key]}%</output></span><input aria-label={i?'Suavidad del rango':'Tolerancia de color'} type="range" min="0" max="100" value={range[key]} style={{'--progress':`${range[key]}%`} as React.CSSProperties} onChange={e=>setRange(r=>({...r,[key]:Number(e.target.value)}))}/></label>)}</div>
-    <p className="help-text">La tolerancia amplía los colores eliminados; la suavidad crea una transición. Afecta todas las zonas del mismo color, incluso detalles interiores. No identifica objetos. Esta escala no equivale a la de Photoshop.</p>
+    <p className="help-text">La tolerancia amplía la selección; la suavidad crea una transición. Afecta todas las zonas del mismo color, incluso detalles interiores. No identifica objetos.</p>
     <p className="help-text" role="status">{message||'Sin cambios en el diseño hasta pulsar Aplicar.'}</p>
-    <div className="modal-actions"><button className="btn" onClick={onCancel}>Cancelar</button><button className="btn export" onClick={()=>onApply(range)}>{purpose==='isolated'?'Quitar color y aplicar aislado':'Aplicar rango de color'}</button></div>
+    <div className="modal-actions"><button className="btn" onClick={onCancel}>Cancelar</button><button className="btn export" onClick={()=>onApply(range)}>{screening?'Aplicar selección':purpose==='isolated'?'Quitar color y aplicar aislado':'Aplicar rango de color'}</button></div>
   </section></div>
 }

@@ -6,6 +6,9 @@ export type HalftoneSettings = {
   preserveColor: boolean; invert: boolean
   background: 'black' | 'white' | 'none' | 'custom'; tolerance: number
   screenScope?: 'transitions' | 'all'
+  affectedColors?: ColorRange
+  protectedColors?: ColorRange
+  organic?: number
   colorRange?: ColorRange
   customBase?: 'black' | 'white'
   dpi?: number; enabled?: boolean; featherMm?: number; trimMm?: number
@@ -29,6 +32,8 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
   const output = new Uint8ClampedArray(data.length)
   const protectedMask = new Uint8Array(width * height)
   const retain=s.background==='custom'?colorRangeRetention(s.colorRange??defaultColorRange):null
+  const affected=s.affectedColors?colorRangeRetention(s.affectedColors):null
+  const protectedColors=s.protectedColors?colorRangeRetention(s.protectedColors):null
   // A custom range is a removal mask layered over the normal black/white
   // screening path selected before sampling. It is not a third screening mode.
   const processingBackground=s.background==='custom'?(s.customBase??'white'):s.background
@@ -54,6 +59,8 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
   const solidAlpha=s.solidAlpha === true || (s.enabled !== false && s.solidAlpha !== false)
   const offsets = solidAlpha ? [.5] : [.25, .75]
   const samples = offsets.length ** 2
+  const organic=Math.max(0,Math.min(100,s.organic??0))/100*.18
+  const hash=(a:number,b:number)=>{const n=Math.sin(a*127.1+b*311.7)*43758.5453;return n-Math.floor(n)}
   // With no background removal, barely-visible export residue has no colour
   // cue to distinguish it from the artwork. Do not promote alpha 1–8/255 to
   // opaque ink when continuous solid-alpha output is requested.
@@ -162,20 +169,28 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
     }
     const removed = coverage === 0 && s.background !== 'none'
     if (removed) { transparent++; continue }
+    const retainedCoverage=coverage*data[i+3]/255*edgeAlpha*colorAlpha
+    const selectionAmount=affected?1-affected(selectionSource[i],selectionSource[i+1],selectionSource[i+2]):1
+    const protectionAmount=protectedColors?1-protectedColors(selectionSource[i],selectionSource[i+1],selectionSource[i+2]):0
+    const screenAmount=selectionAmount*(1-protectionAmount)
     coverage = clamp((coverage - .5) * s.contrast / 100 + .5 + (s.brightness - 100) / 100)
     if (s.invert) coverage = 1 - coverage
     coverage = Math.pow(coverage, 1 / (s.gamma ?? 1))
     coverage = clamp(coverage * (s.enabled === false ? 1 : (s.size / 100) ** 2)) * data[i + 3] / 255 * edgeAlpha * colorAlpha
+    // Selection masks blend toward solid retained ink, without restoring any
+    // pixels removed by the background mask. Protection wins on overlap.
+    if(s.enabled!==false&&screenAmount<1)coverage=coverage*screenAmount+(retainedCoverage>0?1:0)*(1-screenAmount)
     const keepIsolatedSolid = isolatedTransition && colorAlpha >= .999 && data[i + 3] === 255 && edgeAlpha >= .999
     let hits = s.enabled === false ? coverage * samples : keepIsolatedSolid ? samples : 0
     if (s.enabled !== false && !keepIsolatedSolid) for (const oy of offsets) for (const ox of offsets) {
       const rx = ((x + ox) * cos + (y + oy) * sin) / pitch
       const ry = (-(x + ox) * sin + (y + oy) * cos) / pitch
-      const u = Math.abs(rx - Math.floor(rx) - .5) * 2
-      const v = Math.abs(ry - Math.floor(ry) - .5) * 2
+      const cellX=Math.floor(rx),cellY=Math.floor(ry)
+      const u = Math.abs(rx - cellX - .5 - (organic?(hash(cellX,cellY)-.5)*organic:0)) * 2
+      const v = Math.abs(ry - cellY - .5 - (organic?(hash(cellX+19,cellY+47)-.5)*organic:0)) * 2
       // Circular dots join smoothly into solids in highlights.
       const threshold = s.shape === 'line' ? v : s.shape === 'square' ? Math.max(u, v) ** 2 : circleRanks[Math.min(4096, Math.round((u * u + v * v) * 2048))]
-      if (coverage > threshold) hits++
+      if (coverage >= 1 || coverage > threshold) hits++
     }
     if (!hits) { transparent++; continue }
     const mono = s.background === 'black' ? 255 : 0
