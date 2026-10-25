@@ -22,7 +22,7 @@ import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleDot, Crop, Downloa
 type Shape = 'circle' | 'square' | 'line'
 type ViewMode = 'result' | 'split' | 'original'
 type ComparisonTarget = 'result' | 'rescale'
-type WorkflowDestination = {step: 1 | 2 | 3 | 4 | 5; panel?: 'size' | 'retoque' | 'trama' | 'refinamiento'; tool: 'design' | 'gang'}
+type WorkflowDestination = {step: 1 | 2 | 3 | 4 | 5; panel?: 'size' | 'garment' | 'retoque' | 'trama' | 'refinamiento'; tool: 'design' | 'gang'}
 type PrintReviewAction = 'export' | 'resized' | 'gang'
 
 export type Settings = {
@@ -43,6 +43,7 @@ export type Settings = {
   backgroundCleanup?: number
   tolerance: number
   enabled: boolean
+  screenScope: 'transitions' | 'all'
   featherMm: number
   cornerRadiusMm: number
   trimMm: number
@@ -89,6 +90,7 @@ const defaults: Settings = {
   backgroundCleanup: 0,
   tolerance: 25,
   enabled: true,
+  screenScope: 'all',
   featherMm: 0,
   cornerRadiusMm: 0,
   trimMm: 0,
@@ -143,6 +145,7 @@ function readSavedPresets(): SavedPreset[] {
         && (s.whiteDetail===undefined||(Number.isFinite(s.whiteDetail)&&s.whiteDetail>=0&&s.whiteDetail<=100))
         && (s.backgroundCleanup===undefined||(Number.isFinite(s.backgroundCleanup)&&s.backgroundCleanup>=0&&s.backgroundCleanup<=100))
         && ['enabled','preserveColor','invert'].every(key => typeof s[key] === 'boolean')
+        && ['transitions','all'].includes(s.screenScope)
         && typeof s.protectSolid === 'boolean' && typeof s.protectSolidColor === 'string' && /^#[0-9a-f]{6}$/i.test(s.protectSolidColor) && typeof s.protectSmoothEdge === 'boolean'
         && typeof s.flattenColor === 'boolean' && typeof s.flattenColorValue === 'string' && /^#[0-9a-f]{6}$/i.test(s.flattenColorValue)
         && ['autoTone','autoContrast','autoColor','solidAlpha'].every(key => s[key] === undefined || typeof s[key] === 'boolean')
@@ -194,7 +197,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const imageRef = useRef<HTMLImageElement | null>(null)
   const [settings, setSettings] = useState(initialSettings)
   const [garment, setGarment] = useState<GarmentTone>(initialProject.editor?.document.garment??(initialProject.background==='white'?'light':'dark'))
-  const activeGarment:GarmentTone = settings.background==='white'?'light':settings.background==='black'?'dark':garment
+  const activeGarment:GarmentTone = garment
   const presetMode:PresetMode = settings.enabled?'halftone':'continuous'
   const visiblePresets = presetsFor(activeGarment,presetMode)
   const [view, setView] = useState<ViewMode>('split')
@@ -261,13 +264,13 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [previewBg, setPreviewBg] = useState('checker')
   const [error, setError] = useState('')
   const loadId = useRef(0)
-  const [collapsedPanels, setCollapsedPanels] = useState({presets:false, size:true, crop:true, retoque:false, background:true, trama:true, refinamiento:false, ajustes:true, edges:true})
+  const [collapsedPanels, setCollapsedPanels] = useState({presets:false, garment:true, size:true, crop:true, retoque:false, background:true, trama:true, refinamiento:false, ajustes:true, edges:true})
   type PanelKey = keyof typeof collapsedPanels
   const togglePanel = (panel:PanelKey) => setCollapsedPanels(current => {
-    if (current[panel]) return {presets:true,size:true,crop:true,retoque:true,background:true,trama:true,refinamiento:true,ajustes:true,edges:true,[panel]:false}
-    return {presets:true,size:true,crop:true,retoque:true,background:true,trama:true,refinamiento:true,ajustes:true,edges:true}
+    if (current[panel]) return {presets:true,garment:true,size:true,crop:true,retoque:true,background:true,trama:true,refinamiento:true,ajustes:true,edges:true,[panel]:false}
+    return {presets:true,garment:true,size:true,crop:true,retoque:true,background:true,trama:true,refinamiento:true,ajustes:true,edges:true}
   })
-  const openWorkflowPanel = (panel:'size'|'retoque'|'trama'|'refinamiento') => setCollapsedPanels({presets:true, size:true, crop:true, retoque:true, background:true, trama:true, refinamiento:true, ajustes:true, edges:true, [panel]:false})
+  const openWorkflowPanel = (panel:'size'|'garment'|'retoque'|'trama'|'refinamiento') => setCollapsedPanels({presets:true, garment:true, size:true, crop:true, retoque:true, background:true, trama:true, refinamiento:true, ajustes:true, edges:true, [panel]:false})
   const goToWorkflow = (destination: WorkflowDestination) => {
     if (colorBrushTool && destination.step !== workflowStep) {
       setPendingWorkflowDestination(destination)
@@ -531,7 +534,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     if (panel === 'size') { setCrop(null); setDpi(300); setWidthCm((dimensions.width / 300 * 2.54).toFixed(4)); setSettings(s => ({...s, resampleMethod: defaults.resampleMethod, sharpness: defaults.sharpness})); return }
     if (panel === 'retoque') { setSettings(s => ({...s, flattenColor: defaults.flattenColor, flattenColorValue: defaults.flattenColorValue, flattenColorTolerance: defaults.flattenColorTolerance})); colorCorrection.current=null;colorCorrectionHistory.current={past:[],future:[]}; setColorCorrectionVersion(v=>v+1);setHistoryCounts({undo:(history.current?.past.length??0)+eraseHistory.current.past.length,redo:(history.current?.future.length??0)+eraseHistory.current.future.length}); setPickColorTool(false); setColorBrushTool(false); return }
     if (panel === 'background') { setSettings(s => ({...s, background: defaults.background, colorRange: undefined, customBase: undefined, whiteRemoval: defaults.whiteRemoval, whiteCutoff: defaults.whiteCutoff, tolerance: defaults.tolerance, backgroundCleanup: defaults.backgroundCleanup})); return }
-    if (panel === 'trama') { setSettings(s => ({...s, lpi: defaults.lpi, angle: defaults.angle, shape: defaults.shape, size: defaults.size, preserveColor: defaults.preserveColor, invert: defaults.invert, solidAlpha: defaults.solidAlpha, whiteDetail: defaults.whiteDetail})); return }
+    if (panel === 'trama') { setSettings(s => ({...s, screenScope: defaults.screenScope, lpi: defaults.lpi, angle: defaults.angle, shape: defaults.shape, size: defaults.size, preserveColor: defaults.preserveColor, invert: defaults.invert, solidAlpha: defaults.solidAlpha, whiteDetail: defaults.whiteDetail})); return }
     if (panel === 'refinamiento') { setSettings(s => ({...s, preSmooth: defaults.preSmooth, particleMinSize: defaults.particleMinSize, minDotSize: defaults.minDotSize, protectSolid: defaults.protectSolid, protectSolidColor: defaults.protectSolidColor, protectSolidTolerance: defaults.protectSolidTolerance, protectSmoothEdge: defaults.protectSmoothEdge})); clearManualBrush(); return }
     if (panel === 'ajustes') { setSettings(s => ({...s, contrast: defaults.contrast, brightness: defaults.brightness, gamma: defaults.gamma, temperature: defaults.temperature, tint: defaults.tint, autoTone: defaults.autoTone, autoContrast: defaults.autoContrast, autoColor: defaults.autoColor, autoToneStrength: defaults.autoToneStrength, autoContrastStrength: defaults.autoContrastStrength, autoColorStrength: defaults.autoColorStrength})); return }
     setSettings(s => ({...s, featherMm: defaults.featherMm, trimMm: defaults.trimMm, cornerRadiusMm: defaults.cornerRadiusMm, edgeSides: [...defaults.edgeSides],edgeMask:defaults.edgeMask,edgeMaskSizeMm:defaults.edgeMaskSizeMm}))
@@ -545,7 +548,15 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     setGarment(p.garment);setPreset(key);setPresetMessage('')
     setPreviewBg(p.garment==='light'?'white':'black');setComparisonTarget('result');setView('result')
   }
-  const choosePresetGroup = (tone:GarmentTone,mode:PresetMode) => applyPreset(presetsFor(tone,mode)[0][0])
+  const chooseGarment = (tone:GarmentTone) => {
+    setGarment(tone)
+    setPreviewBg(tone==='light'?'white':'black')
+    setPreset('custom')
+  }
+  const choosePresetMode = (mode:PresetMode) => {
+    update('enabled', mode === 'halftone')
+    setView('result')
+  }
 
   const savePreset = () => {
     const baseName = presetName.trim().slice(0, 60)
@@ -906,7 +917,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       <nav className="tool-tabs" aria-label="Flujo de trabajo">
         <button className={`workflow-step ${workflowStep === 1 ? 'active' : ''}`} aria-current={workflowStep === 1 ? 'step' : undefined} onClick={() => goToWorkflow({step:1,tool:'design',panel:'size'})}><b>1</b><span>Tamaño y retoque</span></button>
         <i className="workflow-connector" aria-hidden="true" />
-        <button className={`workflow-step ${workflowStep === 2 ? 'active' : ''}`} aria-current={workflowStep === 2 ? 'step' : undefined} onClick={() => goToWorkflow({step:2,tool:'design',panel:'trama'})}><b>2</b><span>Semitono</span></button>
+        <button className={`workflow-step ${workflowStep === 2 ? 'active' : ''}`} aria-current={workflowStep === 2 ? 'step' : undefined} onClick={() => goToWorkflow({step:2,tool:'design',panel:'garment'})}><b>2</b><span>Semitono</span></button>
         <i className="workflow-connector" aria-hidden="true" />
         <button className={`workflow-step ${workflowStep === 3 ? 'active' : ''}`} aria-current={workflowStep === 3 ? 'step' : undefined} onClick={() => goToWorkflow({step:3,tool:'design',panel:'refinamiento'})}><b>3</b><span>Refinamiento</span></button>
         <i className="workflow-connector" aria-hidden="true" />
@@ -919,12 +930,10 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       <main className={`workspace workflow-layout-${workflowStep} ${prepressCollapsed || !fileName ? 'prepress-collapsed' : ''} ${!fileName ? 'empty-editor' : ''}`} style={{display: tool === 'design' ? undefined : 'none'}}>
         <aside className={`sidebar workflow-step-${workflowStep}`} id="prepress-panel" hidden={prepressCollapsed || !fileName}>
           <div className="sidebar-title"><div><Sparkles size={18} /><span>Pre-prensa</span></div><div className="sidebar-title-actions"><button type="button" className="sidebar-collapse-toggle" aria-label="Ocultar controles de Pre-prensa" title="Ocultar controles" onClick={()=>setPrepressCollapsed(true)}><ChevronLeft size={17}/></button><button type="button" aria-label="Información" aria-expanded={showInfo} onClick={() => setShowInfo(v => !v)}><Info size={17} /></button></div></div>
-          {showInfo && <div className="tip-card"><p>1. Carga tu imagen y define tamaño y ppp. 2. Elige el fondo a eliminar, preset y bordes. 3. Revisa al 100% y sobre la prenda. 4. Exporta PNG o añade a una plancha. El tamaño se graba en el PNG; comprueba que tu RIP respete los centímetros indicados.</p></div>}
+          {showInfo && <div className="tip-card"><p>1. Ajusta el tamaño y retoques. 2. En Semitono elige un preset, el color de prenda, elimina el fondo y luego decide si usar trama. 3. Revisa al 100% y sobre la prenda. 4. Exporta PNG o añade a una plancha. El tamaño se graba en el PNG; comprueba que tu RIP respete los centímetros indicados.</p></div>}
 
-          <section className={`control-card ${collapsedPanels.presets ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.presets} aria-controls="preset-controls" onClick={()=>togglePanel('presets')}><span><SwatchBook size={17} /> Presets</span><ChevronDown size={17}/></button><div className="section-body" id="preset-controls" hidden={collapsedPanels.presets}>
+          <section className={`control-card ${collapsedPanels.presets ? '' : 'open'}`}><button className="section-heading" data-flow-order="1" aria-expanded={!collapsedPanels.presets} aria-controls="preset-controls" onClick={()=>togglePanel('presets')}><span><SwatchBook size={17} /> Presets</span><ChevronDown size={17}/></button><div className="section-body" id="preset-controls" hidden={collapsedPanels.presets}>
             <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('presets')}>Restablecer valores</button>
-            <div className="preset-group"><span className="preset-group-label">Prenda</span><div className="segmented preset-segments" role="group" aria-label="Tono de prenda">{([['dark','Prenda oscura'],['light','Prenda clara']] as const).map(([tone,label])=><button key={tone} type="button" className={activeGarment===tone?'active':''} aria-pressed={activeGarment===tone} onClick={()=>{if(activeGarment!==tone)choosePresetGroup(tone,presetMode)}}>{label}</button>)}</div></div>
-            <div className="preset-group"><span className="preset-group-label">Acabado</span><div className="segmented preset-segments" role="group" aria-label="Acabado">{([['halftone','Semitono'],['continuous','Sin semitono']] as const).map(([mode,label])=><button key={mode} type="button" className={presetMode===mode?'active':''} aria-pressed={presetMode===mode} onClick={()=>{if(presetMode!==mode)choosePresetGroup(activeGarment,mode)}}>{label}</button>)}</div></div>
             <label className="field">Preset<select aria-label="Preset" value={preset.startsWith('saved:')||visiblePresets.some(([key])=>key===preset)?preset:'custom'} onChange={e => {
               const key = e.target.value
               const saved = savedPresets.find(p => p.id === key)
@@ -939,6 +948,11 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             {renamingPreset&&preset.startsWith('saved:')&&<form className="save-preset-form" onSubmit={e=>{e.preventDefault();renamePreset()}}><label className="field">Nuevo nombre<input autoFocus aria-label="Nuevo nombre del preset" maxLength={60} value={renameValue} onChange={e=>setRenameValue(e.target.value)}/></label><button className="btn export" disabled={!renameValue.trim()}>Guardar nombre</button><button type="button" className="btn" onClick={()=>setRenamingPreset(false)}>Cancelar</button></form>}
             {savingPreset && <form className="save-preset-form" onSubmit={e=>{e.preventDefault();savePreset()}}><label className="field">Nombre del preset<input autoFocus aria-label="Nombre del preset" type="text" maxLength={60} placeholder="Ej. DTF negro fino" value={presetName} onChange={e=>setPresetName(e.target.value)} /></label><button className="btn export" type="submit" disabled={!presetName.trim()}>Guardar mis ajustes</button><p className="help-text">Se guarda en este navegador. Incluye trama, color, fondo, nitidez y bordes; excluye tamaño y zoom.</p></form>}
             {presetMessage && <p className="help-text" role="status">{presetMessage}</p>}
+          </div></section>
+
+          <section className={`control-card ${collapsedPanels.garment ? '' : 'open'}`}><button className="section-heading" data-flow-order="2" aria-expanded={!collapsedPanels.garment} aria-controls="garment-controls" onClick={()=>togglePanel('garment')}><span><SwatchBook size={17} /> Color de prenda</span><ChevronDown size={17}/></button><div className="section-body" id="garment-controls" hidden={collapsedPanels.garment}>
+            <div className="segmented preset-segments" role="group" aria-label="Color de prenda">{([['dark','Prenda oscura'],['light','Prenda clara']] as const).map(([tone,label])=><button key={tone} type="button" className={activeGarment===tone?'active':''} aria-pressed={activeGarment===tone} onClick={()=>chooseGarment(tone)}>{label}</button>)}</div>
+            <p className="help-text">Define el color del sustrato para elegir el fondo que vas a retirar y revisar la tinta sobre la prenda correcta.</p>
           </div></section>
 
           <section className={`control-card ${collapsedPanels.size ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.size} aria-controls="size-controls" onClick={()=>togglePanel('size')}><span><Ruler size={17} /> Tamaño de impresión</span><ChevronDown size={17}/></button><div className="section-body" id="size-controls" hidden={collapsedPanels.size}>
@@ -990,10 +1004,14 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             </div>
           </section>
 
-          <section hidden={!settings.enabled} className={`control-card ${collapsedPanels.trama ? '' : 'open'}`}>
-            <button className="section-heading" aria-expanded={!collapsedPanels.trama} aria-controls="trama-controls" onClick={() => togglePanel('trama')}><span><CircleDot size={17} /> Semitono</span><ChevronDown size={17} /></button>
+          <section className={`control-card ${collapsedPanels.trama ? '' : 'open'}`}>
+            <button className="section-heading" data-flow-order="4" aria-expanded={!collapsedPanels.trama} aria-controls="trama-controls" onClick={() => togglePanel('trama')}><span><CircleDot size={17} /> Semitono</span><ChevronDown size={17} /></button>
             <div className="section-body" id="trama-controls" hidden={collapsedPanels.trama}>
+              <div className="preset-group"><span className="preset-group-label">Acabado</span><div className="segmented preset-segments" role="group" aria-label="Acabado">{([['halftone','Semitono'],['continuous','Sin semitono']] as const).map(([mode,label])=><button key={mode} type="button" className={presetMode===mode?'active':''} aria-pressed={presetMode===mode} onClick={()=>choosePresetMode(mode)}>{label}</button>)}</div></div>
+              {settings.enabled ? <>
               <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('trama')}>Restablecer valores</button>
+              <div className="preset-group"><span className="preset-group-label">Aplicar semitono sobre</span><div className="segmented preset-segments" role="group" aria-label="Alcance del semitono"><button type="button" className={settings.screenScope==='transitions'?'active':''} aria-pressed={settings.screenScope==='transitions'} onClick={()=>update('screenScope','transitions')}>Aislado</button><button type="button" className={settings.screenScope==='all'?'active':''} aria-pressed={settings.screenScope==='all'} onClick={()=>update('screenScope','all')}>Diseño completo</button></div></div>
+              <p className="help-text">Aislado conserva sólidos los píxeles plenamente visibles y convierte en puntos únicamente bordes, sombras o luces que quedaron parcialmente retirados con el fondo. Diseño completo aplica la trama tonal a toda la imagen restante.</p>
               <RangeControl label="Frecuencia" value={settings.lpi} min={12} max={65} unit=" LPI" onChange={(v) => update('lpi', v)} />
               <RangeControl label="Ángulo" value={settings.angle} min={0} max={90} step={0.5} unit="°" onChange={(v) => update('angle', v)} />
               <div className="field"><span>Forma del punto</span><div className="segmented shapes">
@@ -1006,11 +1024,12 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               <p className="help-text">Mantiene el color original en los puntos. Desactívalo para generar una tinta única según la prenda.</p>
               <div className="row-label"><span>Invertir trama</span><Toggle checked={settings.invert} onChange={v => update('invert', v)} /></div>
               <p className="help-text">Invierte las zonas de tinta y transparencia del semitono.</p>
-              {settings.background==='white'&&settings.whiteRemoval!=='connected'&&settings.enabled&&settings.preserveColor&&<><RangeControl label="Conservar detalle" value={settings.whiteDetail??0} min={0} max={100} unit="%" onChange={v=>update('whiteDetail',v)}/><p className="help-text">0%: trama tonal sin refuerzo. Aumentarlo refuerza la cobertura según el tono, sin convertir toda la imagen en color continuo. Compensa el color para conservar aproximadamente el tono medio sobre blanco con ajustes neutros. Para quitar la trama, elige «Sin semitono».</p></>}
+              {settings.background==='white'&&settings.whiteRemoval!=='connected'&&settings.enabled&&settings.preserveColor&&<><RangeControl label="Conservar detalle" value={settings.whiteDetail??0} min={0} max={100} unit="%" onChange={v=>update('whiteDetail',v)}/><p className="help-text">0%: trama tonal sin refuerzo. Aumentarlo refuerza la cobertura según el tono, sin convertir toda la imagen en color continuo. Compensa el color para conservar aproximadamente el tono medio sobre blanco con ajustes neutros.</p></>}
+              </> : <p className="help-text">Sin semitono conserva la imagen que quedó tras eliminar el fondo. Puedes volver a activar Semitono sin perder el color de prenda ni la selección del gotero.</p>}
             </div>
           </section>
 
-          <section className={`control-card ${collapsedPanels.background ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.background} aria-controls="background-controls" onClick={()=>togglePanel('background')}><span><Eraser size={17} /> Eliminar fondo</span><ChevronDown size={17}/></button><div className="section-body" id="background-controls" hidden={collapsedPanels.background}>
+          <section className={`control-card ${collapsedPanels.background ? '' : 'open'}`}><button className="section-heading" data-flow-order="3" aria-expanded={!collapsedPanels.background} aria-controls="background-controls" onClick={()=>togglePanel('background')}><span><Eraser size={17} /> Eliminar fondo</span><ChevronDown size={17}/></button><div className="section-body" id="background-controls" hidden={collapsedPanels.background}>
             <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('background')}>Restablecer valores</button>
             <div className="segmented"><button className={settings.background === 'black' ? 'active' : ''} onClick={() => update('background', 'black')}>Negro</button><button className={settings.background === 'white' ? 'active' : ''} onClick={() => update('background', 'white')}>Blanco</button><button className={settings.background === 'none' ? 'active' : ''} onClick={() => update('background', 'none')}>Ninguno</button></div>
             {!settings.enabled && <><div className="row-label"><span>Alfa sólido (DTF)</span><Toggle checked={settings.solidAlpha} onChange={v => update('solidAlpha', v)} /></div><p className="help-text">Activo: todo píxel visible se exporta opaco (alfa 255); las zonas ya transparentes y el fondo eliminado permanecen transparentes. Úsalo para DTF si no necesitas transparencias suaves.</p></>}
@@ -1080,7 +1099,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             </div>
           </section>
 
-          <section className={`control-card ${collapsedPanels.edges ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.edges} aria-controls="edge-controls" onClick={()=>togglePanel('edges')}><span><Frame size={17} /> Bordes y máscaras</span><ChevronDown size={17}/></button><div className="section-body" id="edge-controls" hidden={collapsedPanels.edges}>
+          <section className={`control-card ${collapsedPanels.edges ? '' : 'open'}`}><button className="section-heading" data-flow-order="5" aria-expanded={!collapsedPanels.edges} aria-controls="edge-controls" onClick={()=>togglePanel('edges')}><span><Frame size={17} /> Bordes y máscaras</span><ChevronDown size={17}/></button><div className="section-body" id="edge-controls" hidden={collapsedPanels.edges}>
             <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('edges')}>Restablecer valores</button>
             <button className="text-button" onClick={() => setSettings(s => ({...s, featherMm: 0, trimMm: 0, cornerRadiusMm: 0, edgeSides: [true,true,true,true],edgeMask:'none',edgeMaskSizeMm:5}))}>Reiniciar bordes</button>
             <div className="field"><span>Máscaras de borde</span><div className="edge-mask-grid" role="group" aria-label="Máscaras de borde"><button type="button" aria-pressed={settings.edgeMask==='none'} onClick={()=>update('edgeMask','none')}><EdgeMaskThumbnail style="none"/><span>Sin máscara</span></button>{edgeMaskStyles.map(style=><button key={style.id} type="button" aria-pressed={settings.edgeMask===style.id} onClick={()=>update('edgeMask',style.id)}><EdgeMaskThumbnail style={style.id}/><span>{style.name}</span></button>)}</div></div>

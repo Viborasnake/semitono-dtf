@@ -10,7 +10,7 @@ export type GarmentPreset = {label:string; description:string; garment:GarmentTo
 const neutral:PresetValues = {
   lpi:32,angle:22.5,shape:'circle',size:100,contrast:100,brightness:100,
   whiteCutoff:255,preserveColor:true,invert:false,background:'black',
-  whiteRemoval:'all',whiteDetail:0,backgroundCleanup:0,tolerance:0,enabled:true,sharpness:0,
+  whiteRemoval:'all',whiteDetail:0,backgroundCleanup:0,tolerance:0,enabled:true,screenScope:'all',sharpness:0,
   gamma:1,autoTone:false,autoContrast:false,autoColor:false,
   autoToneStrength:100,autoContrastStrength:100,autoColorStrength:100,
   solidAlpha:true,temperature:0,tint:0,resampleMethod:'lanczos3',preSmooth:0,particleMinSize:0,minDotSize:0,protectSolid:false,protectSolidColor:'#ffffff',protectSolidTolerance:10,protectSmoothEdge:true,flattenColor:false,flattenColorValue:'#ffffff',flattenColorTolerance:12,

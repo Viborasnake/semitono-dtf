@@ -28,6 +28,28 @@ test('midtones contain holes and unmatted bright ink', () => {
   assert.ok(result.transparent > 10 && result.transparent < 90)
   for (let i=0; i<result.data.length; i+=4) if(result.data[i+3]) assert.equal(result.data[i],255)
 })
+test('transition-only screening preserves solid artwork and dots only partial edges',()=>{
+  const solid=image(110,70,35)
+  const transitionSettings={...settings,background:'none' as const,screenScope:'transitions' as const,solidAlpha:true}
+  const preserved=halftone(solid,64,64,transitionSettings).data
+  for(let i=0;i<preserved.length;i+=4)assert.deepEqual(Array.from(preserved.slice(i,i+4)),[110,70,35,255])
+
+  const partial=image(110,70,35,96)
+  const dotted=halftone(partial,64,64,transitionSettings).data
+  const visible=Array.from(dotted).filter((_,i)=>i%4===3&&dotted[i]===255).length
+  assert.ok(visible>0&&visible<64*64)
+
+  const screened=halftone(solid,64,64,{...transitionSettings,screenScope:'all'}).data
+  assert.ok(Array.from(screened).some((_,i)=>i%4===3&&screened[i]===0))
+})
+test('isolated eyedropper screening preserves retained pixels while complete mode keeps legacy tonality',()=>{
+  const gray=image(128,128,128)
+  const custom={...settings,background:'custom' as const,customBase:'white' as const,colorRange:{colors:['#ffffff'],tolerance:0,softness:0},solidAlpha:true}
+  const isolated=halftone(gray,64,64,{...custom,screenScope:'transitions'}).data
+  for(let i=0;i<isolated.length;i+=4)assert.deepEqual(Array.from(isolated.slice(i,i+4)),[128,128,128,255])
+  const complete=halftone(gray,64,64,{...custom,screenScope:'all'}).data
+  assert.ok(Array.from(complete).some((_,i)=>i%4===3&&complete[i]===0))
+})
 test('white mode removes white and keeps black', () => {
   const s = {...settings, background: 'white' as const}
   assert.equal(halftone(image(255,255,255),64,64,s).transparent,100)

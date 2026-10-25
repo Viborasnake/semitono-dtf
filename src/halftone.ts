@@ -5,6 +5,7 @@ export type HalftoneSettings = {
   contrast: number; brightness: number; whiteCutoff: number
   preserveColor: boolean; invert: boolean
   background: 'black' | 'white' | 'none' | 'custom'; tolerance: number
+  screenScope?: 'transitions' | 'all'
   colorRange?: ColorRange
   customBase?: 'black' | 'white'
   dpi?: number; enabled?: boolean; featherMm?: number; trimMm?: number
@@ -92,7 +93,11 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
     let r = data[i] / 255, g = data[i + 1] / 255, b = data[i + 2] / 255
     const max = Math.max(r, g, b), min = Math.min(r, g, b)
     let coverage: number
-    if (processingBackground === 'black') {
+    if (s.background === 'custom' && s.screenScope === 'transitions') {
+      // The eyedropper mask already defines the transition. Keep every fully
+      // retained design pixel solid and screen only the softened mask edge.
+      coverage = 1
+    } else if (processingBackground === 'black') {
       coverage = max <= s.tolerance / 255 ? 0 : clamp((max - s.tolerance / 255) / (1 - s.tolerance / 255))
       // Remove the black matte so it cannot become a dark outline on
       // transparency or a colored garment, including in continuous mode.
@@ -144,7 +149,7 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
         const gainReduction=peak/(peak+(48/255-peak)*amount)
         r=1-(1-r)*gainReduction;g=1-(1-g)*gainReduction;b=1-(1-b)*gainReduction
       }
-    } else coverage = s.enabled === false ? 1 : 1 - (.2126 * r + .7152 * g + .0722 * b)
+    } else coverage = s.enabled === false || s.screenScope === 'transitions' ? 1 : 1 - (.2126 * r + .7152 * g + .0722 * b)
     if (solidBlack && coverage > 0 && coverage < .5) {
       let connected = false
       for (let oy = -1; oy <= 1 && !connected; oy++) for (let ox = -1; ox <= 1; ox++) {

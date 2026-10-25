@@ -21,6 +21,7 @@ function checkDocument(d:EditorDocument) {
   if(s.whiteRemoval!==undefined&&!['all','connected'].includes(s.whiteRemoval))fail()
   if(s.whiteDetail!==undefined&&(!Number.isFinite(s.whiteDetail)||s.whiteDetail<0||s.whiteDetail>100))fail()
   if(s.backgroundCleanup!==undefined&&(!Number.isFinite(s.backgroundCleanup)||s.backgroundCleanup<0||s.backgroundCleanup>100))fail()
+  if(s.screenScope!==undefined&&!['transitions','all'].includes(s.screenScope))fail()
   if(s.edgeMask!==undefined&&!isEdgeMaskStyle(s.edgeMask))fail()
   if(s.edgeMaskSizeMm!==undefined&&(!Number.isFinite(s.edgeMaskSizeMm)||s.edgeMaskSizeMm<.5||s.edgeMaskSizeMm>20))fail()
   const numeric=['lpi','angle','size','contrast','brightness','whiteCutoff','tolerance','featherMm','cornerRadiusMm','trimMm','sharpness','gamma','autoToneStrength','autoContrastStrength','temperature','tint','autoColorStrength'] as const
