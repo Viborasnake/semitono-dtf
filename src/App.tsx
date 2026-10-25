@@ -18,6 +18,7 @@ import ColorRangePanel from './ColorRangePanel'
 import {defaultColorRange,validColorRange,type ColorRange} from './color-range'
 import {applyEdgeMask,edgeMaskStyles,isEdgeMaskStyle,type EdgeMaskStyle} from './edge-mask'
 import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleDot, Crop, Download, Eraser, FolderOpen, Frame, Hand, Image as ImageIcon, Info, Layers3, Minus, Pipette, Plus, RotateCcw, Ruler, SlidersHorizontal, Sparkles, SwatchBook, Trash2, Upload, ZoomIn } from 'lucide-react'
+import HalftoneWorker from './halftone.worker?worker&inline'
 
 type Shape = 'circle' | 'square' | 'line'
 type ViewMode = 'result' | 'split' | 'original'
@@ -671,7 +672,10 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
         original.width = input.width
         original.height = input.height
         original.getContext('2d')!.putImageData(input, 0, 0)
-        worker = new Worker(new URL('./halftone.worker.ts', import.meta.url), { type: 'module' })
+        // Keep the worker in the application bundle. GitHub Pages replaces the
+        // previous deployment atomically, so an older cached page could point
+        // at a hashed worker file that no longer exists after a deploy.
+        worker = new HalftoneWorker()
         processingWorker.current = worker
         worker.onmessage = ({ data }) => {
           if (cancelled) return
@@ -698,7 +702,19 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           worker?.terminate()
           if (processingWorker.current === worker) processingWorker.current = null
         }
-        worker.onerror = () => { if (!cancelled) setError('No se pudo procesar. Reduce el tamaño e inténtalo nuevamente.'); worker?.terminate(); if (processingWorker.current === worker) processingWorker.current = null }
+        worker.onerror = event => {
+          if (!cancelled) {
+            const detail = event.message && event.message !== 'Script error.' ? ` Detalle: ${event.message}` : ''
+            setError(`No se pudo iniciar el procesador.${detail} Recarga la aplicación e inténtalo nuevamente.`)
+          }
+          worker?.terminate()
+          if (processingWorker.current === worker) processingWorker.current = null
+        }
+        worker.onmessageerror = () => {
+          if (!cancelled) setError('El navegador no pudo leer el resultado del procesador. Recarga la aplicación e inténtalo nuevamente.')
+          worker?.terminate()
+          if (processingWorker.current === worker) processingWorker.current = null
+        }
         const cachedEntry=resizedCache.current?.key===resizeKey ? resizedCache.current : null
         const cached=cachedEntry ? new Uint8ClampedArray(cachedEntry.data) : null
         const workerData=cached??input.data
