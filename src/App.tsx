@@ -17,7 +17,7 @@ import CropPanel, {type CropRect} from './CropPanel'
 import ColorRangePanel from './ColorRangePanel'
 import {defaultColorRange,validColorRange,type ColorRange} from './color-range'
 import {applyEdgeMask,edgeMaskStyles,isEdgeMaskStyle,type EdgeMaskStyle} from './edge-mask'
-import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleDot, Download, Eraser, FolderOpen, Frame, Hand, Image as ImageIcon, Info, Layers3, Minus, Pipette, Plus, RotateCcw, Ruler, SlidersHorizontal, Sparkles, SwatchBook, Trash2, Upload, ZoomIn } from 'lucide-react'
+import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleDot, Crop, Download, Eraser, FolderOpen, Frame, Hand, Image as ImageIcon, Info, Layers3, Minus, Pipette, Plus, RotateCcw, Ruler, SlidersHorizontal, Sparkles, SwatchBook, Trash2, Upload, ZoomIn } from 'lucide-react'
 
 type Shape = 'circle' | 'square' | 'line'
 type ViewMode = 'result' | 'split' | 'original'
@@ -258,13 +258,13 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [previewBg, setPreviewBg] = useState('checker')
   const [error, setError] = useState('')
   const loadId = useRef(0)
-  const [collapsedPanels, setCollapsedPanels] = useState({presets:false, size:true, retoque:false, background:true, trama:true, refinamiento:false, ajustes:true, edges:true})
+  const [collapsedPanels, setCollapsedPanels] = useState({presets:false, size:true, crop:true, retoque:false, background:true, trama:true, refinamiento:false, ajustes:true, edges:true})
   type PanelKey = keyof typeof collapsedPanels
   const togglePanel = (panel:PanelKey) => setCollapsedPanels(current => {
-    if (current[panel]) return {presets:true,size:true,retoque:true,background:true,trama:true,refinamiento:true,ajustes:true,edges:true,[panel]:false}
-    return {presets:true,size:true,retoque:true,background:true,trama:true,refinamiento:true,ajustes:true,edges:true}
+    if (current[panel]) return {presets:true,size:true,crop:true,retoque:true,background:true,trama:true,refinamiento:true,ajustes:true,edges:true,[panel]:false}
+    return {presets:true,size:true,crop:true,retoque:true,background:true,trama:true,refinamiento:true,ajustes:true,edges:true}
   })
-  const openWorkflowPanel = (panel:'size'|'retoque'|'trama'|'refinamiento') => setCollapsedPanels({presets:true, size:true, retoque:true, background:true, trama:true, refinamiento:true, ajustes:true, edges:true, [panel]:false})
+  const openWorkflowPanel = (panel:'size'|'retoque'|'trama'|'refinamiento') => setCollapsedPanels({presets:true, size:true, crop:true, retoque:true, background:true, trama:true, refinamiento:true, ajustes:true, edges:true, [panel]:false})
   const goToWorkflow = (destination: WorkflowDestination) => {
     if (colorBrushTool && destination.step !== workflowStep) {
       setPendingWorkflowDestination(destination)
@@ -938,9 +938,6 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
 
           <section className={`control-card ${collapsedPanels.size ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.size} aria-controls="size-controls" onClick={()=>togglePanel('size')}><span><Ruler size={17} /> Tamaño de impresión</span><ChevronDown size={17}/></button><div className="section-body" id="size-controls" hidden={collapsedPanels.size}>
             <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('size')}>Restablecer valores</button>
-            <button className="btn" disabled={loading} onClick={()=>setShowCrop(true)}>Recortar imagen (Crop)</button>
-            <button className="btn" disabled={loading||!fileName||!output} onClick={trimToContent}>Recortar al contenido</button>
-            <p className="help-text">Quita márgenes transparentes del original, sin ampliar el diseño. Conserva los huecos internos. Puedes deshacer el recorte.</p>{cropMessage&&<p className="help-text" role="status">{cropMessage}</p>}
             <details className="advanced-controls"><summary>Escala por porcentaje</summary><div className="advanced-body">
             <label className="field">Reescalado de imagen (%)<input aria-label="Reescalado de imagen en porcentaje" type="number" min="1" max="2000" step="25" value={widthCm && Number(widthCm) > 0 ? Number((Number(widthCm) / 2.54 * dpi / dimensions.width * 100).toFixed(1)) : ''} onChange={e => setWidthCm(e.target.value ? (dimensions.width * Number(e.target.value) / 100 / dpi * 2.54).toFixed(4) : '')} /></label>
             <div className="scale-presets">{[100,200,300,400].map(percent => <button key={percent} onClick={() => setWidthCm((dimensions.width * percent / 100 / dpi * 2.54).toFixed(4))}>{percent}%</button>)}</div>
@@ -962,6 +959,12 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <div className="field"><span>Presets de nitidez</span><div className="scale-presets sharpness-presets" role="group" aria-label="Presets de nitidez">{[0,25,50].map(value => <button key={value} type="button" aria-pressed={settings.sharpness===value} onClick={() => update('sharpness', value)}>{value}%</button>)}</div></div>
             <p className="help-text">Se aplica después de ampliar y antes del semitono. Usa valores bajos para fotografías y valores altos solo para gráficos definidos; el alfa se protege para reducir halos.</p>
             {sizeError && <p className="error-text" role="alert">{sizeError}</p>}
+          </div></section>
+
+          <section className={`control-card ${collapsedPanels.crop ? '' : 'open'}`}><button className="section-heading" aria-expanded={!collapsedPanels.crop} aria-controls="crop-controls" onClick={()=>togglePanel('crop')}><span><Crop size={17} /> Recorte</span><ChevronDown size={17}/></button><div className="section-body" id="crop-controls" hidden={collapsedPanels.crop}>
+            <button className="btn" disabled={loading} onClick={()=>setShowCrop(true)}>Recortar imagen</button>
+            <button className="btn" disabled={loading||!fileName||!output} onClick={trimToContent}>Recortar al contenido</button>
+            <p className="help-text">Quita márgenes transparentes del original, sin ampliar el diseño. Conserva los huecos internos. Puedes deshacer el recorte.</p>{cropMessage&&<p className="help-text" role="status">{cropMessage}</p>}
           </div></section>
 
           <section className={`control-card ${collapsedPanels.retoque ? '' : 'open'}`}>
