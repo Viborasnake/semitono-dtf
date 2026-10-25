@@ -21,7 +21,8 @@ import { Check, ChevronDown, ChevronLeft, ChevronRight, CircleDot, Crop, Downloa
 
 type Shape = 'circle' | 'square' | 'line'
 type ViewMode = 'result' | 'split' | 'original'
-type WorkflowDestination = {step: 1 | 2 | 3 | 4 | 5 | 6; panel?: 'size' | 'retoque' | 'trama' | 'refinamiento'; tool: 'design' | 'gang'}
+type ComparisonTarget = 'result' | 'rescale'
+type WorkflowDestination = {step: 1 | 2 | 3 | 4 | 5; panel?: 'size' | 'retoque' | 'trama' | 'refinamiento'; tool: 'design' | 'gang'}
 type PrintReviewAction = 'export' | 'resized' | 'gang'
 
 export type Settings = {
@@ -187,6 +188,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [prepressCollapsed,setPrepressCollapsed]=useState(false)
   const [projectCollapsed,setProjectCollapsed]=useState(true)
   const sourceCanvas = useRef<HTMLCanvasElement>(null)
+  const originalCanvas = useRef<HTMLCanvasElement>(null)
   const resultCanvas = useRef<HTMLCanvasElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLImageElement | null>(null)
@@ -196,6 +198,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const presetMode:PresetMode = settings.enabled?'halftone':'continuous'
   const visiblePresets = presetsFor(activeGarment,presetMode)
   const [view, setView] = useState<ViewMode>('split')
+  const [comparisonTarget, setComparisonTarget] = useState<ComparisonTarget>('result')
   const [zoom, setZoom] = useState(100)
   const [fit, setFit] = useState(true)
   const viewportRef = useRef<HTMLDivElement>(null)
@@ -220,7 +223,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const handActive = handTool || spaceHeld
   const [viewport, setViewport] = useState({width: 600, height: 600})
   const [tool, setTool] = useState<'design' | 'gang'>('design')
-  const [workflowStep, setWorkflowStep] = useState<1 | 2 | 3 | 4 | 5 | 6>(1)
+  const [workflowStep, setWorkflowStep] = useState<1 | 2 | 3 | 4 | 5>(1)
   const [pendingWorkflowDestination, setPendingWorkflowDestination] = useState<WorkflowDestination | null>(null)
   const [gangSafetyReport,setGangSafetyReport]=useState<HalftoneSafetyReport|null>(null)
   const [printReviewAction,setPrintReviewAction]=useState<PrintReviewAction|null>(null)
@@ -411,7 +414,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     ctx.putImageData(pixels, left, top)
   }
   const startBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!brushTool || colorBrushTool || pickColorTool || e.button !== 0 || view === 'original' || processing || exporting) return
+    if (!brushTool || colorBrushTool || pickColorTool || comparisonTarget === 'rescale' || e.button !== 0 || view === 'original' || processing || exporting) return
     const canvas = resultCanvas.current
     if (!canvas) return
     const previous = manualErase.current?.width === canvas.width && manualErase.current?.height === canvas.height
@@ -453,7 +456,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     setColorCorrectionVersion(v => v + 1)
   }
   const startColorBrush = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!colorBrushTool || brushTool || pickColorTool || e.button !== 0 || view === 'original' || processing || exporting) return
+    if (!colorBrushTool || brushTool || pickColorTool || comparisonTarget === 'rescale' || e.button !== 0 || view === 'original' || processing || exporting) return
     const canvas = resultCanvas.current
     if (!canvas) return
     const previous = colorCorrection.current?.width === canvas.width && colorCorrection.current.height === canvas.height
@@ -472,7 +475,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
   }
   const pickOriginalColor = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!pickColorTool || e.button !== 0) return
+    if (!pickColorTool || comparisonTarget === 'rescale' || e.button !== 0) return
     const canvas = sourceCanvas.current, point = brushPoint(e)
     if (!canvas || !point) return
     const pixel = canvas.getContext('2d')!.getImageData(Math.round(point.x), Math.round(point.y), 1, 1).data
@@ -538,9 +541,9 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     const p=presets[key]
     if(!p)return
     clearManualBrush()
-    setSettings(s=>({...s,...p.values}))
+    setSettings(s=>({...s,...p.values,resampleMethod:s.resampleMethod,sharpness:s.sharpness}))
     setGarment(p.garment);setPreset(key);setPresetMessage('')
-    setPreviewBg(p.garment==='light'?'white':'black');setView('result')
+    setPreviewBg(p.garment==='light'?'white':'black');setComparisonTarget('result');setView('result')
   }
   const choosePresetGroup = (tone:GarmentTone,mode:PresetMode) => applyPreset(presetsFor(tone,mode)[0][0])
 
@@ -653,6 +656,10 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
         const ctx = native.getContext('2d', { willReadFrequently: true })!
         ctx.drawImage(imageRef.current!, 0, 0)
         const input = ctx.getImageData(crop?.x ?? 0, crop?.y ?? 0, crop?.width ?? native.width, crop?.height ?? native.height)
+        const original = originalCanvas.current!
+        original.width = input.width
+        original.height = input.height
+        original.getContext('2d')!.putImageData(input, 0, 0)
         worker = new Worker(new URL('./halftone.worker.ts', import.meta.url), { type: 'module' })
         processingWorker.current = worker
         worker.onmessage = ({ data }) => {
@@ -829,14 +836,14 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     const replaceId=editingAssetId
     setExporting(true)
     resultCanvas.current?.toBlob(async blob => {
-      try {if(!blob)throw new Error('No se pudo generar el diseño.');const tagged=new Blob([withCanvasPrintProfile(new Uint8Array(await blob.arrayBuffer()),sourceDpi)],{type:'image/png'});setGangSource({id: Date.now(), blob:tagged, widthCm: width, name,document:editorDocument,replaceId});loadId.current++;processingWorker.current?.terminate();processingWorker.current=null;imageRef.current=null;manualErase.current=null;manualBase.current=null;setImageVersion(v=>v+1);setFileName('');setEditingAssetId(undefined);setCrop(null);setLoading(false);setDisplaySize(null);setReadyKey('');setProcessingProgress(0);setBrushTool(false);setError('');setExportMessage('');setReadyForNewImage(true);setWorkflowStep(6);setTool('gang')}
+      try {if(!blob)throw new Error('No se pudo generar el diseño.');const tagged=new Blob([withCanvasPrintProfile(new Uint8Array(await blob.arrayBuffer()),sourceDpi)],{type:'image/png'});setGangSource({id: Date.now(), blob:tagged, widthCm: width, name,document:editorDocument,replaceId});loadId.current++;processingWorker.current?.terminate();processingWorker.current=null;imageRef.current=null;manualErase.current=null;manualBase.current=null;setImageVersion(v=>v+1);setFileName('');setEditingAssetId(undefined);setCrop(null);setLoading(false);setDisplaySize(null);setReadyKey('');setProcessingProgress(0);setBrushTool(false);setError('');setExportMessage('');setReadyForNewImage(true);setWorkflowStep(5);setTool('gang')}
       catch(e){setError((e as Error).message)}finally{setExporting(false)}
     }, 'image/png')
   }
 
   const reviewPrint = (action:PrintReviewAction) => {
     if (!output || readyKey !== renderKey || loading || exporting || !imageRef.current) return
-    if(action==='gang')setWorkflowStep(5)
+    if(action==='gang')setWorkflowStep(4)
     setPrintReviewAction(action)
     const upscaleFactor = appliedNeuralScale
     setGangSafetyReport(assessHalftoneSafety({dpi,sourceDpi:dimensions.width/output.widthCm*2.54,upscaleFactor,neuralRequested:settings.resampleMethod==='neural2'||settings.resampleMethod==='neural4',lpi:settings.lpi,size:settings.size,minDotSize:settings.minDotSize,solidAlpha:settings.solidAlpha,enabled:action==='resized'?false:settings.enabled}))
@@ -848,7 +855,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     setSettings(current=>({...current,solidAlpha:true,lpi:current.enabled?Math.min(current.lpi,Math.floor(dpi/6)):current.lpi}))
     setPreset('custom');setGangSafetyReport(null)
     const action=printReviewAction;setPrintReviewAction(null)
-    if(action==='gang')setWorkflowStep(3)
+    if(action==='gang')setWorkflowStep(2)
     setExportMessage('Optimización DTF aplicada. Espera el nuevo resultado y revísalo antes de exportar.')
   }
 
@@ -897,17 +904,15 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       </div>
 
       <nav className="tool-tabs" aria-label="Flujo de trabajo">
-        <button className={`workflow-step ${workflowStep === 1 ? 'active' : ''}`} aria-current={workflowStep === 1 ? 'step' : undefined} onClick={() => goToWorkflow({step:1,tool:'design',panel:'size'})}><b>1</b><span>Tamaño</span></button>
+        <button className={`workflow-step ${workflowStep === 1 ? 'active' : ''}`} aria-current={workflowStep === 1 ? 'step' : undefined} onClick={() => goToWorkflow({step:1,tool:'design',panel:'size'})}><b>1</b><span>Tamaño y retoque</span></button>
         <i className="workflow-connector" aria-hidden="true" />
-        <button className={`workflow-step ${workflowStep === 2 ? 'active' : ''}`} aria-current={workflowStep === 2 ? 'step' : undefined} onClick={() => goToWorkflow({step:2,tool:'design',panel:'retoque'})}><b>2</b><span>Retoque</span></button>
+        <button className={`workflow-step ${workflowStep === 2 ? 'active' : ''}`} aria-current={workflowStep === 2 ? 'step' : undefined} onClick={() => goToWorkflow({step:2,tool:'design',panel:'trama'})}><b>2</b><span>Semitono</span></button>
         <i className="workflow-connector" aria-hidden="true" />
-        <button className={`workflow-step ${workflowStep === 3 ? 'active' : ''}`} aria-current={workflowStep === 3 ? 'step' : undefined} onClick={() => goToWorkflow({step:3,tool:'design',panel:'trama'})}><b>3</b><span>Semitono</span></button>
+        <button className={`workflow-step ${workflowStep === 3 ? 'active' : ''}`} aria-current={workflowStep === 3 ? 'step' : undefined} onClick={() => goToWorkflow({step:3,tool:'design',panel:'refinamiento'})}><b>3</b><span>Refinamiento</span></button>
         <i className="workflow-connector" aria-hidden="true" />
-        <button className={`workflow-step ${workflowStep === 4 ? 'active' : ''}`} aria-current={workflowStep === 4 ? 'step' : undefined} onClick={() => goToWorkflow({step:4,tool:'design',panel:'refinamiento'})}><b>4</b><span>Refinamiento</span></button>
+        <button className={`workflow-step ${workflowStep === 4 ? 'active' : ''}`} aria-current={workflowStep === 4 ? 'step' : undefined} onClick={reviewBeforeGang} disabled={!fileName || processing}><b>4</b><span>Revisión</span></button>
         <i className="workflow-connector" aria-hidden="true" />
-        <button className={`workflow-step ${workflowStep === 5 ? 'active' : ''}`} aria-current={workflowStep === 5 ? 'step' : undefined} onClick={reviewBeforeGang} disabled={!fileName || processing}><b>5</b><span>Revisión</span></button>
-        <i className="workflow-connector" aria-hidden="true" />
-        <button className={`workflow-step ${workflowStep === 6 ? 'active' : ''}`} aria-current={workflowStep === 6 ? 'step' : undefined} onClick={() => goToWorkflow({step:6,tool:'gang'})}><b>6</b><span>Gang Sheet</span></button>
+        <button className={`workflow-step ${workflowStep === 5 ? 'active' : ''}`} aria-current={workflowStep === 5 ? 'step' : undefined} onClick={() => goToWorkflow({step:5,tool:'gang'})}><b>5</b><span>Gang Sheet</span></button>
         <span>Todo se procesa en tu equipo</span>
       </nav>
       <div className="gang-container" style={{display: tool === 'gang' ? 'block' : 'none'}}><GangSheet source={gangSource} onImportFile={requestImport} onEditDocument={editGangDocument} previewColor={previewBg} onPreviewColorChange={setPreviewBg} getEditor={snapshotEditor} restoreEditor={restoreProjectEditor} initialProject={initialProject} editorRevision={JSON.stringify([renderKey,fileName,editingAssetId,activeGarment])} editorLoading={loading} onSaveStatus={setProjectStatus} actionsRef={projectActions}/></div>
@@ -924,7 +929,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               const key = e.target.value
               const saved = savedPresets.find(p => p.id === key)
               setPresetMessage('');setRenamingPreset(false)
-              if(saved){setSettings({...saved.settings,edgeSides:[...saved.settings.edgeSides]});if(saved.garment)setGarment(saved.garment);setPreset(key);setView('result');if(saved.settings.background!=='none')setPreviewBg(saved.settings.background);else if(saved.garment)setPreviewBg(saved.garment==='light'?'white':'black')}
+              if(saved){setSettings({...saved.settings,edgeSides:[...saved.settings.edgeSides]});if(saved.garment)setGarment(saved.garment);setPreset(key);setComparisonTarget('result');setView('result');if(saved.settings.background!=='none')setPreviewBg(saved.settings.background);else if(saved.garment)setPreviewBg(saved.garment==='light'?'white':'black')}
               else applyPreset(key)
             }}><option value="custom" disabled>Personalizado</option><optgroup label={`${activeGarment==='dark'?'Prenda oscura':'Prenda clara'} · ${presetMode==='halftone'?'Semitono':'Sin semitono'}`}>{visiblePresets.map(([key,p]) => <option key={key} value={key}>{p.label}</option>)}</optgroup>{savedPresets.length>0 && <optgroup label="Mis presets">{savedPresets.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>}</select></label>
             <p className="help-text">{preset in presets ? presets[preset].description : preset.startsWith('saved:') ? 'Preset guardado: trama, nitidez, fondo y bordes. El tamaño de impresión se mantiene.' : 'Ajustes personalizados.'}</p>
@@ -968,8 +973,8 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           </div></section>
 
           <section className={`control-card ${collapsedPanels.retoque ? '' : 'open'}`}>
-            <button className="section-heading" aria-expanded={!collapsedPanels.retoque} aria-controls="retouch-controls" onClick={() => togglePanel('retoque')}><span><Pipette size={17} /> Retoque de color</span><ChevronDown size={17} /></button>
-            <div className="section-body" id="retouch-controls" hidden={collapsedPanels.retoque}>
+            <button className="section-heading" aria-expanded={!collapsedPanels.retoque} aria-controls="flatten-controls" onClick={() => togglePanel('retoque')}><span><Pipette size={17} /> Aplanar colores</span><ChevronDown size={17} /></button>
+            <div className="section-body" id="flatten-controls" hidden={collapsedPanels.retoque}>
               <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('retoque')}>Restablecer valores</button>
               <div className="row-label"><span>Aplanar color seleccionado</span><Toggle checked={settings.flattenColor} onChange={v => update('flattenColor', v)} /></div>
               <label className="color-picker-field"><span>Color aplanado</span><input aria-label="Color aplanado" type="color" value={settings.flattenColorValue} onChange={e => update('flattenColorValue', e.target.value)} /></label>
@@ -1101,7 +1106,8 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <div className="view-switch">
               <button className={view === 'original' ? 'active' : ''} onClick={() => setView('original')}><ImageIcon size={15} /> Original</button>
               <button className={view === 'split' ? 'active' : ''} onClick={() => setView('split')}><Layers3 size={15} /> Comparar</button>
-              <button className={view === 'result' ? 'active' : ''} onClick={() => setView('result')}><CircleDot size={15} /> Resultado</button>
+              <button className={view === 'result' ? 'active' : ''} onClick={() => setView('result')}><CircleDot size={15} /> {comparisonTarget === 'rescale' ? 'Reescalada' : 'Resultado'}</button>
+              <button type="button" className={comparisonTarget === 'rescale' ? 'active' : ''} aria-label="Comparar original y reescalado" title="Comparar el original con la imagen reescalada" aria-pressed={comparisonTarget === 'rescale'} disabled={!output || processing} onClick={() => {setComparisonTarget(target => target === 'rescale' ? 'result' : 'rescale');setView('split');setBrushTool(false);setColorBrushTool(false);setPickColorTool(false)}}><Layers3 size={15} /> Reescalado</button>
             </div>
             <div className="preview-background"><span>Vista sobre</span><select aria-label="Fondo de vista previa" value={previewBg} onChange={(e) => setPreviewBg(e.target.value)}>
               <option value="checker">Transparencia</option>
@@ -1162,8 +1168,11 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           <div className={`canvas-area ${handActive ? 'hand-active' : ''} ${panning ? 'is-panning' : ''} ${(brushTool || colorBrushTool || pickColorTool) ? 'brush-active' : ''} ${pickColorTool ? 'color-picker-active' : ''}`} ref={viewportRef} onPointerDownCapture={startPan} onPointerDown={e=>{pickOriginalColor(e);startColorBrush(e);startBrush(e)}} onPointerMove={e=>{movePan(e);moveColorBrush(e);moveBrush(e)}} onPointerLeave={()=>setBrushCursor(null)} onPointerUp={e=>{stopPan(e);stopColorBrush(e);stopBrush(e)}} onPointerCancel={e=>{stopPan(e);stopColorBrush(e);stopBrush(e)}} onLostPointerCapture={e=>{stopPan(e);stopColorBrush(e);stopBrush(e)}}>
             {!fileName && <div className="start-upload"><Upload size={36}/><h2>{readyForNewImage?'Listo para otro diseño':'Arrastra tu imagen aquí'}</h2><p>{readyForNewImage?'Carga una nueva imagen para continuar':'PNG, JPG, WebP o SVG'}</p><button className="btn export" disabled={loading} onClick={()=>fileInput.current?.click()}>{loading?'Abriendo imagen…':readyForNewImage?'Cargar nueva imagen':'Abrir imagen'}</button>{error && <p className="error-text" role="alert">{error}</p>}</div>}
             <div className="artboard" hidden={!fileName} style={{ width: Math.max(1, visibleSize.width * previewScale), height: Math.max(1, visibleSize.height * previewScale), aspectRatio: `${visibleSize.width} / ${visibleSize.height}`, ...(previewBg !== 'checker' ? { backgroundImage: 'none', backgroundColor: previewBg } : {}) }}>
-              <canvas ref={sourceCanvas} className="art-canvas" style={{ clipPath: view === 'split' ? `inset(0 ${100 - split}% 0 0)` : 'none', visibility: view === 'result' ? 'hidden' : 'visible' }} />
-              <div className="result-layer" style={{ clipPath: view === 'split' ? `inset(0 0 0 ${split}%)` : 'none', visibility: view === 'original' ? 'hidden' : 'visible' }}><canvas ref={resultCanvas} className="art-canvas" /></div>
+              <canvas ref={originalCanvas} className="art-canvas" style={{ clipPath: view === 'split' ? `inset(0 ${100 - split}% 0 0)` : 'none', visibility: view === 'result' ? 'hidden' : 'visible' }} />
+              <div className="result-layer" style={{ clipPath: view === 'split' ? `inset(0 0 0 ${split}%)` : 'none', visibility: view === 'original' ? 'hidden' : 'visible' }}>
+                <canvas ref={sourceCanvas} className="art-canvas" style={{visibility: comparisonTarget === 'rescale' ? 'visible' : 'hidden'}} />
+                <canvas ref={resultCanvas} className="art-canvas" style={{visibility: comparisonTarget === 'result' ? 'visible' : 'hidden'}} />
+              </div>
               {(brushTool || colorBrushTool || pickColorTool) && brushCursor && resultCanvas.current && <div className={`brush-cursor ${pickColorTool ? 'color-picker-cursor' : ''}`} style={{left: brushCursor.x, top: brushCursor.y, width: pickColorTool ? 18 : brushSize * resultCanvas.current.getBoundingClientRect().width / resultCanvas.current.width, height: pickColorTool ? 18 : brushSize * resultCanvas.current.getBoundingClientRect().height / resultCanvas.current.height}} aria-hidden="true" />}
               {view === 'split' && <><div className="split-line" style={{ left: `${split}%` }}><span><Minus /><Minus /></span></div>{!brushTool && !colorBrushTool && !pickColorTool && <input className="split-input" aria-label="Divisor de comparación" type="range" min="0" max="100" value={split} onChange={(e) => setSplit(Number(e.target.value))} />}</>}
             </div>
@@ -1204,7 +1213,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           {gangSafetyReport.generatedResolution && <p className="help-text">Neural generó píxeles adicionales antes de la trama. Mejora la resolución disponible para esta salida, pero el detalle creado es estimado: revísalo al 100% y con una prueba física.</p>}
           <p className="help-text">Esta revisión detecta riesgos de resolución, tamaño y filtros. Un semitono representa los tonos más claros con transparencias, por lo que no puede garantizar un degradado sin huecos blancos; confirma siempre una prueba física y el comportamiento de tu RIP.</p>
           <div className="modal-actions">
-            <button type="button" className="btn ghost" onClick={()=>{const action=printReviewAction;setGangSafetyReport(null);setPrintReviewAction(null);if(action==='gang')setWorkflowStep(4)}}>Volver a ajustar</button>
+            <button type="button" className="btn ghost" onClick={()=>{const action=printReviewAction;setGangSafetyReport(null);setPrintReviewAction(null);if(action==='gang')setWorkflowStep(3)}}>Volver a ajustar</button>
             {canOptimizeForDtf&&<button type="button" className="btn" onClick={optimizeForDtf}>Optimizar para DTF</button>}
             <button type="button" className="btn export" onClick={()=>{const action=printReviewAction;setGangSafetyReport(null);setPrintReviewAction(null);if(action==='gang')sendToGang();else if(action==='resized')exportResizedPng();else exportPng()}}>{printReviewAction==='gang'?(gangSafetyReport.issues.length?'Enviar de todas formas':'Enviar a Gang Sheet'):printReviewAction==='resized'?'Exportar PNG reescalado':'Exportar PNG'}</button>
           </div>

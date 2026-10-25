@@ -17,6 +17,14 @@ test('each garment has five halftone and three continuous presets, including one
     }
   }
 })
+test('switching included presets preserves the reescalado method and sharpness',()=>{
+  for(const preset of Object.values(garmentPresets)){
+    const previous={...preset.values,resampleMethod:'neural4' as const,sharpness:50}
+    const next={...previous,...preset.values,resampleMethod:previous.resampleMethod,sharpness:previous.sharpness}
+    assert.equal(next.resampleMethod,'neural4')
+    assert.equal(next.sharpness,50)
+  }
+})
 
 test('one-color presets never output chromatic pixels, at every DPI and finish',()=>{
   const side=96,data=new Uint8ClampedArray(side*side*4)
