@@ -44,9 +44,12 @@ test('transition-only screening preserves solid artwork and dots only partial ed
 })
 test('isolated eyedropper screening preserves retained pixels while complete mode keeps legacy tonality',()=>{
   const gray=image(128,128,128)
-  const custom={...settings,background:'custom' as const,customBase:'white' as const,colorRange:{colors:['#ffffff'],tolerance:0,softness:0},solidAlpha:true}
+  const custom={...settings,background:'custom' as const,customBase:'white' as const,colorRange:{colors:['#ffffff'],tolerance:0,softness:0},solidAlpha:true,size:45}
   const isolated=halftone(gray,64,64,{...custom,screenScope:'transitions'}).data
   for(let i=0;i<isolated.length;i+=4)assert.deepEqual(Array.from(isolated.slice(i,i+4)),[128,128,128,255])
+  const transition=halftone(gray,64,64,{...custom,colorRange:{colors:['#ffffff'],tolerance:0,softness:100},screenScope:'transitions'}).data
+  const transitionDots=Array.from(transition).filter((_,i)=>i%4===3&&transition[i]===255).length
+  assert.ok(transitionDots>0&&transitionDots<64*64)
   const complete=halftone(gray,64,64,{...custom,screenScope:'all'}).data
   assert.ok(Array.from(complete).some((_,i)=>i%4===3&&complete[i]===0))
 })

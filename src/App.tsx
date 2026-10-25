@@ -240,6 +240,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [presetMessage, setPresetMessage] = useState('')
   const [showInfo, setShowInfo] = useState(false)
   const [showColorRange,setShowColorRange]=useState(false)
+  const [isolatedColorPick,setIsolatedColorPick]=useState(false)
   const [cropMessage,setCropMessage]=useState('')
   const [gangSource, setGangSource] = useState<GangSource>()
   const [editingAssetId,setEditingAssetId]=useState<string>()
@@ -556,6 +557,16 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   }
   const choosePresetMode = (mode:PresetMode) => {
     update('enabled', mode === 'halftone')
+    setView('result')
+  }
+  const chooseScreenScope = (scope:Settings['screenScope']) => {
+    if (scope === 'transitions' && settings.background !== 'custom') {
+      setIsolatedColorPick(true)
+      setShowColorRange(true)
+      return
+    }
+    setIsolatedColorPick(false)
+    update('screenScope', scope)
     setView('result')
   }
 
@@ -1026,8 +1037,9 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               <div className="preset-group"><span className="preset-group-label">Acabado</span><div className="segmented preset-segments" role="group" aria-label="Acabado">{([['halftone','Semitono'],['continuous','Sin semitono']] as const).map(([mode,label])=><button key={mode} type="button" className={presetMode===mode?'active':''} aria-pressed={presetMode===mode} onClick={()=>choosePresetMode(mode)}>{label}</button>)}</div></div>
               {settings.enabled ? <>
               <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('trama')}>Restablecer valores</button>
-              <div className="preset-group"><span className="preset-group-label">Aplicar semitono sobre</span><div className="segmented preset-segments" role="group" aria-label="Alcance del semitono"><button type="button" className={settings.screenScope==='transitions'?'active':''} aria-pressed={settings.screenScope==='transitions'} onClick={()=>update('screenScope','transitions')}>Aislado</button><button type="button" className={settings.screenScope==='all'?'active':''} aria-pressed={settings.screenScope==='all'} onClick={()=>update('screenScope','all')}>Diseño completo</button></div></div>
-              <p className="help-text">Aislado conserva sólidos los píxeles plenamente visibles y convierte en puntos únicamente bordes, sombras o luces que quedaron parcialmente retirados con el fondo. Diseño completo aplica la trama tonal a toda la imagen restante.</p>
+              <div className="preset-group"><span className="preset-group-label">Aplicar semitono sobre</span><div className="segmented preset-segments" role="group" aria-label="Alcance del semitono"><button type="button" className={settings.screenScope==='transitions'?'active':''} aria-pressed={settings.screenScope==='transitions'} onClick={()=>chooseScreenScope('transitions')}>Aislado</button><button type="button" className={settings.screenScope==='all'?'active':''} aria-pressed={settings.screenScope==='all'} onClick={()=>chooseScreenScope('all')}>Diseño completo</button></div></div>
+              <p className="help-text">Aislado abre el gotero para elegir el color del sustrato que se restará. Conserva intacto el diseño sólido y convierte en puntos sólo la transición creada por la tolerancia y suavidad. Diseño completo aplica la trama tonal a toda la imagen restante.</p>
+              {settings.screenScope==='transitions'&&settings.background==='custom'&&<p className="help-text success-inline">Aislado activo · sustrato seleccionado: {settings.colorRange?.colors.join(', ')}.</p>}
               <RangeControl label="Frecuencia" value={settings.lpi} min={12} max={65} unit=" LPI" onChange={(v) => update('lpi', v)} />
               <RangeControl label="Ángulo" value={settings.angle} min={0} max={90} step={0.5} unit="°" onChange={(v) => update('angle', v)} />
               <div className="field"><span>Forma del punto</span><div className="segmented shapes">
@@ -1049,8 +1061,8 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('background')}>Restablecer valores</button>
             <div className="segmented"><button className={settings.background === 'black' ? 'active' : ''} onClick={() => update('background', 'black')}>Negro</button><button className={settings.background === 'white' ? 'active' : ''} onClick={() => update('background', 'white')}>Blanco</button><button className={settings.background === 'none' ? 'active' : ''} onClick={() => update('background', 'none')}>Ninguno</button></div>
             {!settings.enabled && <><div className="row-label"><span>Alfa sólido (DTF)</span><Toggle checked={settings.solidAlpha} onChange={v => update('solidAlpha', v)} /></div><p className="help-text">Activo: todo píxel visible se exporta opaco (alfa 255); las zonas ya transparentes y el fondo eliminado permanecen transparentes. Úsalo para DTF si no necesitas transparencias suaves.</p></>}
-            <button className={`btn color-range-trigger ${settings.background==='custom'?'active':''}`} disabled={!fileName||loading} onClick={()=>setShowColorRange(true)}><Pipette size={16}/><span>{settings.background==='custom'?'Editar rango de color…':'Gotero · Rango de color…'}</span></button>
-            {settings.background==='custom'&&<p className="help-text">Color personalizado activo · {settings.colorRange?.colors.join(', ')}. Tolerancia {settings.colorRange?.tolerance}%. Primero se elimina la selección y después se aplica el semitono normal sobre los colores restantes, para prenda {settings.customBase==='black'?'oscura':'clara'}.</p>}
+            <button className={`btn color-range-trigger ${settings.background==='custom'?'active':''}`} disabled={!fileName||loading} onClick={()=>{setIsolatedColorPick(false);setShowColorRange(true)}}><Pipette size={16}/><span>{settings.background==='custom'?'Editar color del sustrato…':'Gotero · Color del sustrato…'}</span></button>
+            {settings.background==='custom'&&<p className="help-text">Color del sustrato activo · {settings.colorRange?.colors.join(', ')}. Tolerancia {settings.colorRange?.tolerance}%. Primero se elimina esa selección y después se aplica {settings.screenScope==='transitions'?'el semitono sólo a su transición':'el semitono al diseño restante'}, para prenda {settings.customBase==='black'?'oscura':'clara'}.</p>}
             {settings.background === 'black' && <RangeControl label="Eliminar sombras" value={settings.tolerance} min={0} max={100} onChange={(v) => update('tolerance', v)} />}
             {settings.background==='black'&&settings.enabled&&settings.preserveColor&&<><RangeControl label="Limpiar ruido en sombras" value={settings.backgroundCleanup??0} min={0} max={100} unit="%" onChange={v=>{update('backgroundCleanup',v);setView('result')}}/><p className="help-text">0%: apagado. Reduce puntos brillantes de color en zonas casi negras, sin desaturar el diseño completo. Puede oscurecer o quitar detalle oscuro real: compara antes de exportar. No afecta los tonos fuera de esa zona.</p></>}
             {settings.background==='white'&&settings.whiteRemoval!=='connected'&&settings.enabled&&settings.preserveColor&&<><RangeControl label="Limpiar ruido en blancos" value={settings.backgroundCleanup??0} min={0} max={100} unit="%" onChange={v=>{update('backgroundCleanup',v);setView('result')}}/><p className="help-text">0%: apagado. Reduce puntos residuales de color en zonas casi blancas. Puede aclarar o quitar detalles claros reales, incluido el pelaje: compara antes de exportar. No afecta los tonos fuera de esa zona.</p></>}
@@ -1255,7 +1267,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
         </section>
       </div>}
       {showCrop && imageRef.current && <CropPanel image={imageRef.current} initial={crop ?? {x:0,y:0,width:dimensions.width,height:dimensions.height}} onCancel={()=>setShowCrop(false)} onApply={rect=>{setWidthCm((Number(widthCm)*rect.width/dimensions.width).toFixed(4));setDimensions({width:rect.width,height:rect.height});setCrop(rect);setShowCrop(false);setFit(true)}}/>}
-      {showColorRange&&imageRef.current&&<ColorRangePanel image={imageRef.current} crop={crop} initial={settings.colorRange??{...defaultColorRange,colors:[settings.background==='black'?'#000000':'#ffffff']}} onCancel={()=>setShowColorRange(false)} onApply={colorRange=>{const base=settings.background==='black'||settings.background==='white'?settings.background:activeGarment==='dark'?'black':'white';setGarment(activeGarment);setSettings(s=>({...s,background:'custom',customBase:base,colorRange,preserveColor:true}));setPreset('custom');setView('result');setShowColorRange(false)}}/>}
+      {showColorRange&&imageRef.current&&<ColorRangePanel purpose={isolatedColorPick?'isolated':'background'} image={imageRef.current} crop={crop} initial={settings.colorRange??{...defaultColorRange,colors:[settings.background==='black'?'#000000':'#ffffff']}} onCancel={()=>{setShowColorRange(false);setIsolatedColorPick(false)}} onApply={colorRange=>{const base=settings.background==='black'||settings.background==='white'?settings.background:activeGarment==='dark'?'black':'white';setGarment(activeGarment);setSettings(s=>({...s,background:'custom',customBase:base,colorRange,preserveColor:true,...(isolatedColorPick?{screenScope:'transitions' as const}:{})}));setPreset('custom');setView('result');setShowColorRange(false);setIsolatedColorPick(false)}}/>}
     </div>
   )
 }

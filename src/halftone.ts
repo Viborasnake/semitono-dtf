@@ -93,7 +93,8 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
     let r = data[i] / 255, g = data[i + 1] / 255, b = data[i + 2] / 255
     const max = Math.max(r, g, b), min = Math.min(r, g, b)
     let coverage: number
-    if (s.background === 'custom' && s.screenScope === 'transitions') {
+    const isolatedTransition = s.screenScope === 'transitions' && (s.background === 'custom' || processingBackground === 'none')
+    if (isolatedTransition) {
       // The eyedropper mask already defines the transition. Keep every fully
       // retained design pixel solid and screen only the softened mask edge.
       coverage = 1
@@ -165,8 +166,9 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
     if (s.invert) coverage = 1 - coverage
     coverage = Math.pow(coverage, 1 / (s.gamma ?? 1))
     coverage = clamp(coverage * (s.enabled === false ? 1 : (s.size / 100) ** 2)) * data[i + 3] / 255 * edgeAlpha * colorAlpha
-    let hits = s.enabled === false ? coverage * samples : 0
-    if (s.enabled !== false) for (const oy of offsets) for (const ox of offsets) {
+    const keepIsolatedSolid = isolatedTransition && colorAlpha >= .999 && data[i + 3] === 255 && edgeAlpha >= .999
+    let hits = s.enabled === false ? coverage * samples : keepIsolatedSolid ? samples : 0
+    if (s.enabled !== false && !keepIsolatedSolid) for (const oy of offsets) for (const ox of offsets) {
       const rx = ((x + ox) * cos + (y + oy) * sin) / pitch
       const ry = (-(x + ox) * sin + (y + oy) * cos) / pitch
       const u = Math.abs(rx - Math.floor(rx) - .5) * 2
