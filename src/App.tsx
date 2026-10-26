@@ -632,6 +632,19 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   // printed size at the selected output DPI (e.g. 300 ppp => 32% zoom).
   const realSizeZoom = 96 / dpi * 100
   const changeZoom = (factor: number) => { setZoom(Math.max(5, Math.min(400, Math.round(shownZoom * factor)))); setFit(false) }
+  const rescaleMethodLabel = settings.resampleMethod === 'neural2' || settings.resampleMethod === 'neural4'
+    ? appliedNeuralScale > 1 ? `Neural ×${appliedNeuralScale}` : 'Lanczos-3 · respaldo'
+    : settings.resampleMethod === 'lanczos3' ? 'Lanczos-3'
+      : settings.resampleMethod === 'bicubic' ? 'Bicúbico'
+        : settings.resampleMethod === 'bilinear' ? 'Bilineal' : 'Vecino más cercano'
+  const selectComparison = (target:ComparisonTarget) => {
+    setComparisonTarget(target)
+    setView('split')
+    setBrushTool(false)
+    setColorBrushTool(false)
+    setPickColorTool(false)
+    if (target === 'rescale') { setFit(false); setZoom(100) }
+  }
 
   const loadImage = (src: string, name: string, sourceDpi=300, physicalWidth?:number, document?:EditorDocument,assetId?:string) => {
     const id = ++loadId.current
@@ -1168,12 +1181,18 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               <button className="btn" disabled={loading||!historyCounts.undo} onClick={()=>navigateHistory('undo')} title="Deshacer (⌘/Ctrl Z)">↶ Deshacer</button>
               <button className="btn" disabled={loading||!historyCounts.redo} onClick={()=>navigateHistory('redo')} title="Rehacer (⌘/Ctrl Shift Z)">↷ Rehacer</button>
             </div>
-            <div className="view-switch">
-              <button className={view === 'original' ? 'active' : ''} onClick={() => setView('original')}><ImageIcon size={15} /> {comparisonTarget==='background'?'Fondo eliminado':'Original'}</button>
-              <button className={view === 'split' ? 'active' : ''} onClick={() => setView('split')}><Layers3 size={15} /> Comparar</button>
-              <button className={view === 'result' ? 'active' : ''} onClick={() => setView('result')}><CircleDot size={15} /> {comparisonTarget === 'rescale' ? 'Reescalada' : 'Resultado'}</button>
-              <button type="button" className={comparisonTarget === 'rescale' ? 'active' : ''} aria-label="Comparar original y reescalado" title="Comparar el original con la imagen reescalada" aria-pressed={comparisonTarget === 'rescale'} disabled={!output || processing} onClick={() => {setComparisonTarget(target => target === 'rescale' ? 'result' : 'rescale');setView('split');setBrushTool(false);setColorBrushTool(false);setPickColorTool(false)}}><Layers3 size={15} /> Reescalado</button>
-              <button type="button" className={comparisonTarget==='background'?'active':''} disabled={!output||processing} aria-pressed={comparisonTarget==='background'} onClick={()=>{setComparisonTarget(target=>target==='background'?'result':'background');setView('split')}}>Fondo / trama</button>
+            <div className="view-controls">
+              <div className="view-switch" role="group" aria-label="Modo de vista">
+                <button className={view === 'original' ? 'active' : ''} onClick={() => setView('original')}><ImageIcon size={15} /> {comparisonTarget==='background'?'Fondo eliminado':comparisonTarget==='rescale'?'Original sin reescalar':'Original'}</button>
+                <button className={view === 'split' ? 'active' : ''} onClick={() => setView('split')}><Layers3 size={15} /> Divisor</button>
+                <button className={view === 'result' ? 'active' : ''} onClick={() => setView('result')}><CircleDot size={15} /> {comparisonTarget === 'rescale' ? 'Reescalado' : comparisonTarget==='background'?'Con trama':'Resultado'}</button>
+              </div>
+              <div className="comparison-switch" role="group" aria-label="Contenido de la comparación">
+                <span>Comparar:</span>
+                <button type="button" className={comparisonTarget==='result'?'active':''} disabled={!output||processing} aria-pressed={comparisonTarget==='result'} onClick={()=>selectComparison('result')}>Resultado final</button>
+                <button type="button" className={comparisonTarget === 'rescale' ? 'active' : ''} aria-label="Comparar original sin reescalar y reescalado" title="Abre al 100% para revisar el detalle generado por el método de reescalado" aria-pressed={comparisonTarget === 'rescale'} disabled={!output || processing} onClick={() => selectComparison('rescale')}><Layers3 size={15} /> Reescalado</button>
+                <button type="button" className={comparisonTarget==='background'?'active':''} disabled={!output||processing} aria-pressed={comparisonTarget==='background'} onClick={()=>selectComparison('background')}>Fondo / trama</button>
+              </div>
             </div>
             <div className="preview-background"><span>Vista sobre</span><select aria-label="Fondo de vista previa" value={previewBg} onChange={(e) => setPreviewBg(e.target.value)}>
               <option value="checker">Transparencia</option>
@@ -1240,8 +1259,13 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
                 <canvas ref={resultCanvas} className="art-canvas" style={{visibility: comparisonTarget !== 'rescale' ? 'visible' : 'hidden'}} />
               </div>
               {(brushTool || colorBrushTool || pickColorTool) && brushCursor && resultCanvas.current && <div className={`brush-cursor ${pickColorTool ? 'color-picker-cursor' : ''}`} style={{left: brushCursor.x, top: brushCursor.y, width: pickColorTool ? 18 : brushSize * resultCanvas.current.getBoundingClientRect().width / resultCanvas.current.width, height: pickColorTool ? 18 : brushSize * resultCanvas.current.getBoundingClientRect().height / resultCanvas.current.height}} aria-hidden="true" />}
+              {view === 'split' && <div className="comparison-labels" aria-hidden="true">
+                <span className="comparison-label-left">{comparisonTarget==='rescale'?`Original · ${resizeInfo?.sourceWidth.toLocaleString()} × ${resizeInfo?.sourceHeight.toLocaleString()} px`:comparisonTarget==='background'?'Fondo eliminado':'Original'}</span>
+                <span className="comparison-label-right">{comparisonTarget==='rescale'?`${rescaleMethodLabel} · ${resizeInfo?.outputWidth.toLocaleString()} × ${resizeInfo?.outputHeight.toLocaleString()} px`:comparisonTarget==='background'?'Con trama':'Resultado final'}</span>
+              </div>}
               {view === 'split' && <><div className="split-line" style={{ left: `${split}%` }}><span><Minus /><Minus /></span></div>{!brushTool && !colorBrushTool && !pickColorTool && <input className="split-input" aria-label="Divisor de comparación" type="range" min="0" max="100" value={split} onChange={(e) => setSplit(Number(e.target.value))} />}</>}
             </div>
+            {fileName&&comparisonTarget==='rescale'&&view==='split'&&<p className="rescale-compare-hint">Vista al 100% · arrastra el divisor para comparar el detalle antes y después del reescalado.</p>}
             {dragging && <div className="drop-overlay"><Upload size={32} /><b>Suelta tu imagen aquí</b><span>PNG, JPG, WebP o SVG</span></div>}
           </div>
 
