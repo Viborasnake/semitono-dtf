@@ -5,6 +5,8 @@ export type HalftoneSafetyInput = {
   upscaleFactor?: number
   /** A Neural method was selected, but the model did not produce its extra pixels. */
   neuralRequested?: boolean
+  /** Concrete worker warning when the selected Neural model fell back. */
+  neuralFailureReason?: string
   lpi: number
   size: number
   minDotSize: number
@@ -51,7 +53,7 @@ export function assessHalftoneSafety(input: HalftoneSafetyInput): HalftoneSafety
   if (input.neuralRequested && !generatedResolution) {
     issues.push({
       title: 'Neural no se pudo aplicar',
-      message: 'La ampliación se procesó con Lanczos-3 como respaldo, por lo que no hay píxeles Neural adicionales para esta revisión. Esto puede ocurrir con originales de más de 4 MP o si el modelo no puede ejecutarse.',
+      message: input.neuralFailureReason || 'La ampliación se procesó con Lanczos-3 como respaldo. Revisa el estado Neural junto al método de reescalado para conocer la causa.',
     })
   }
 

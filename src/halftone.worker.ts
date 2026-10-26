@@ -22,7 +22,7 @@ self.onmessage = async (event) => {
         warning = `Neural ×${neuralScale} no se aplicó: generaría más de 48 megapíxeles intermedios. Se usó Lanczos-3 para evitar un error de memoria.`
       } else {
         try { neural = await neuralUpscaleRgba(data, sourceWidth, sourceHeight, neuralScale, fraction => progress(8 + Math.round(54 * fraction))); if (neural) appliedNeuralScale = neuralScale }
-        catch (error) { warning = `Neural no pudo procesar esta imagen; se usó Lanczos-3 como respaldo.${import.meta.env.DEV && error instanceof Error ? ` ${error.message}` : ''}` }
+        catch (error) { warning = `Neural ×${neuralScale} no pudo ejecutarse; se usó Lanczos-3 como respaldo.${error instanceof Error ? ` Detalle: ${error.message}` : ''}` }
       }
     }
       progress(neural ? 62 : 42)

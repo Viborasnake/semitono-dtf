@@ -24,19 +24,10 @@ export function sampleUpscaledEdge(data:Uint8ClampedArray,width:number,height:nu
   return alpha>1e-8?{r:red/alpha,g:green/alpha,b:blue/alpha,a:alpha*255}:{r:0,g:0,b:0,a:0}
 }
 
-// Experimental CPU/WASM path. Tiles keep peak memory bounded and the padded
+// Portable WASM path. Tiles keep peak memory bounded and the padded
 // overlap prevents visible seams when the model sees a tile boundary.
 export async function neuralUpscaleRgba(data: Uint8ClampedArray, width: number, height: number, scale: 2 | 4, onProgress?: (fraction: number) => void) {
   const modelUrl = `${import.meta.env.BASE_URL}models/real_esrgan_x${scale}.onnx`
-  if (typeof navigator !== 'undefined' && 'gpu' in navigator) {
-    try {
-      const ort = await import('onnxruntime-web/webgpu')
-      return await runUpscale(ort, 'webgpu', modelUrl, data, width, height, scale, onProgress)
-    } catch {
-      // A browser can expose WebGPU yet reject this model or fail a tile.
-      // Retry from the original pixels with the portable WASM backend.
-    }
-  }
   const ort = await import('onnxruntime-web')
   ort.env.wasm.numThreads = 1
   return runUpscale(ort, 'wasm', modelUrl, data, width, height, scale, onProgress)
@@ -44,7 +35,7 @@ export async function neuralUpscaleRgba(data: Uint8ClampedArray, width: number, 
 
 async function runUpscale(
   ort: typeof import('onnxruntime-web'),
-  provider: 'webgpu' | 'wasm',
+  provider: 'wasm',
   modelUrl: string,
   data: Uint8ClampedArray,
   width: number,
