@@ -1,6 +1,17 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {paddedTileSize,sampleUpscaledEdge,sourceIsNeutral} from './neural-upscale.ts'
+import {absoluteAssetUrl,paddedTileSize,sampleUpscaledEdge,sourceIsNeutral} from './neural-upscale.ts'
+
+test('resolves Neural assets to absolute GitHub Pages URLs for workers',()=>{
+  assert.equal(
+    absoluteAssetUrl('/semitono-dtf/models/real_esrgan_x4.onnx','https://viborasnake.github.io'),
+    'https://viborasnake.github.io/semitono-dtf/models/real_esrgan_x4.onnx',
+  )
+  assert.equal(
+    absoluteAssetUrl('https://cdn.example.com/ort.wasm','https://viborasnake.github.io'),
+    'https://cdn.example.com/ort.wasm',
+  )
+})
 
 test('neural color cleanup applies to monochrome artwork but preserves colored ink',()=>{
   assert.equal(sourceIsNeutral(255,255,255),true)

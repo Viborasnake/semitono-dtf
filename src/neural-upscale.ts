@@ -9,6 +9,12 @@ export function sourceIsNeutral(r: number, g: number, b: number) {
   return peak < 48 || peak - Math.min(r, g, b) <= 12
 }
 
+export function absoluteAssetUrl(path: string, assetOrigin: string) {
+  if (/^https?:\/\//i.test(path)) return path
+  if (!assetOrigin) throw new Error(`No se pudo resolver el recurso Neural: ${path}`)
+  return new URL(path, `${assetOrigin.replace(/\/$/, '')}/`).href
+}
+
 // Positive bilinear sampling of premultiplied RGB and alpha. Neural models do
 // not predict transparency, so the source alpha must be enlarged separately;
 // nearest-neighbour alpha produced blocky outlines and exposed invented colour.
@@ -27,14 +33,14 @@ export function sampleUpscaledEdge(data:Uint8ClampedArray,width:number,height:nu
 // Portable WASM path. Tiles keep peak memory bounded and the padded
 // overlap prevents visible seams when the model sees a tile boundary.
 export async function neuralUpscaleRgba(data: Uint8ClampedArray, width: number, height: number, scale: 2 | 4, onProgress?: (fraction: number) => void,assetOrigin='') {
-  const modelUrl = `${import.meta.env.BASE_URL}models/real_esrgan_x${scale}.onnx`
+  const modelUrl = absoluteAssetUrl(`${import.meta.env.BASE_URL}models/real_esrgan_x${scale}.onnx`, assetOrigin)
   const ort = await import('onnxruntime-web')
   const {default:ortWasmUrl}=await import('./ort-wasm-url')
   ort.env.wasm.numThreads = 1
   // Load the binary ourselves. ONNX Runtime otherwise uses synchronous XHR
   // inside the bundled worker, where a root-relative path is rejected as an
   // invalid URL on GitHub Pages. Passing bytes bypasses URL/XHR resolution.
-  const absoluteWasmUrl=ortWasmUrl.startsWith('http')?ortWasmUrl:`${assetOrigin}${ortWasmUrl}`
+  const absoluteWasmUrl=absoluteAssetUrl(ortWasmUrl,assetOrigin)
   const wasmResponse=await fetch(absoluteWasmUrl)
   if(!wasmResponse.ok)throw new Error(`No se pudo cargar el motor Neural (${wasmResponse.status}).`)
   ort.env.wasm.wasmBinary=new Uint8Array(await wasmResponse.arrayBuffer())
