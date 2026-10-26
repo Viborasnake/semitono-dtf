@@ -621,6 +621,10 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const renderKey = JSON.stringify([imageVersion, output?.width, output?.height, dpi, settings,crop,colorCorrectionVersion,garment,comparisonTarget==='background'])
   const resizeKey = JSON.stringify([imageVersion, output?.width, output?.height, dpi, settings.resampleMethod, settings.sharpness, crop])
   const processing = loading || (!!output && readyKey !== renderKey && !error)
+  const neuralProcessing=settings.resampleMethod==='neural2'||settings.resampleMethod==='neural4'
+  const processingLabel=neuralProcessing
+    ? processingProgress<63?`Procesando Neural ×${settings.resampleMethod==='neural4'?4:2} en tu equipo…`:'Terminando reescalado y trama…'
+    : settings.enabled?'Procesando trama…':'Procesando imagen…'
   const visibleSize=displaySize ?? dimensions
   const previewScale = fit ? Math.min((viewport.width - 48) / visibleSize.width, (viewport.height - 48) / visibleSize.height, 1) : zoom / 100
   const shownZoom = Math.max(1, Math.round(previewScale * 100))
@@ -739,7 +743,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
         worker.postMessage(message, correctionData ? [workerData.buffer, correctionData.buffer] : [workerData.buffer])
         native.width = native.height = 1
       } catch (e) { if (!cancelled) setError((e as Error).message) }
-    }, 120)
+    }, neuralProcessing?500:120)
     return () => { cancelled = true; clearTimeout(timer); worker?.terminate(); if (processingWorker.current === worker) processingWorker.current = null }
   }, [renderKey, loading, resizeKey])
 
@@ -1221,7 +1225,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           {processing && <div className="processing stage-processing" role="status" aria-live="polite">
             <span className="processing-spinner" />
             <div className="processing-content">
-              <div className="processing-label">Procesando trama… <b>{processingProgress}%</b></div>
+              <div className="processing-label">{processingLabel} <b>{processingProgress}%</b>{neuralProcessing&&processingProgress<63&&<small> Puede tardar entre 30 segundos y 2 minutos.</small>}</div>
               <div className="processing-progress" role="progressbar" aria-label="Progreso del procesamiento" aria-valuemin={0} aria-valuemax={100} aria-valuenow={processingProgress}><i style={{ width: `${processingProgress}%` }} /></div>
             </div>
             <button type="button" className="processing-stop" onClick={stopProcessing}>Detener</button>

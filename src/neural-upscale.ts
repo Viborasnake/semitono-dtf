@@ -1,4 +1,5 @@
 const PAD = 16
+const ortWasmUrl=new URL('../node_modules/onnxruntime-web/dist/ort-wasm-simd-threaded.jsep.wasm',import.meta.url).href
 
 export function paddedTileSize(coreSize: number, scale: 2 | 4) {
   return Math.ceil((coreSize + PAD * 2) / scale) * scale
@@ -30,6 +31,10 @@ export async function neuralUpscaleRgba(data: Uint8ClampedArray, width: number, 
   const modelUrl = `${import.meta.env.BASE_URL}models/real_esrgan_x${scale}.onnx`
   const ort = await import('onnxruntime-web')
   ort.env.wasm.numThreads = 1
+  // The bundled module runs inside our image worker. On GitHub Pages its
+  // inferred import.meta.url can be a blob URL, which ONNX Runtime cannot use
+  // as the base for `new URL(...)`. Pass the deployed WASM asset explicitly.
+  ort.env.wasm.wasmPaths = {wasm:new URL(ortWasmUrl,self.location.href).href}
   return runUpscale(ort, 'wasm', modelUrl, data, width, height, scale, onProgress)
 }
 
