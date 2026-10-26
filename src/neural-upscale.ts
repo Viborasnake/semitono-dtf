@@ -26,15 +26,18 @@ export function sampleUpscaledEdge(data:Uint8ClampedArray,width:number,height:nu
 
 // Portable WASM path. Tiles keep peak memory bounded and the padded
 // overlap prevents visible seams when the model sees a tile boundary.
-export async function neuralUpscaleRgba(data: Uint8ClampedArray, width: number, height: number, scale: 2 | 4, onProgress?: (fraction: number) => void) {
+export async function neuralUpscaleRgba(data: Uint8ClampedArray, width: number, height: number, scale: 2 | 4, onProgress?: (fraction: number) => void,assetOrigin='') {
   const modelUrl = `${import.meta.env.BASE_URL}models/real_esrgan_x${scale}.onnx`
   const ort = await import('onnxruntime-web')
   const {default:ortWasmUrl}=await import('./ort-wasm-url')
   ort.env.wasm.numThreads = 1
-  // The bundled module runs inside our image worker. On GitHub Pages its
-  // inferred import.meta.url can be a blob URL, which ONNX Runtime cannot use
-  // as the base for `new URL(...)`. Pass the deployed WASM asset explicitly.
-  ort.env.wasm.wasmPaths = {wasm:ortWasmUrl}
+  // Load the binary ourselves. ONNX Runtime otherwise uses synchronous XHR
+  // inside the bundled worker, where a root-relative path is rejected as an
+  // invalid URL on GitHub Pages. Passing bytes bypasses URL/XHR resolution.
+  const absoluteWasmUrl=ortWasmUrl.startsWith('http')?ortWasmUrl:`${assetOrigin}${ortWasmUrl}`
+  const wasmResponse=await fetch(absoluteWasmUrl)
+  if(!wasmResponse.ok)throw new Error(`No se pudo cargar el motor Neural (${wasmResponse.status}).`)
+  ort.env.wasm.wasmBinary=new Uint8Array(await wasmResponse.arrayBuffer())
   return runUpscale(ort, 'wasm', modelUrl, data, width, height, scale, onProgress)
 }
 

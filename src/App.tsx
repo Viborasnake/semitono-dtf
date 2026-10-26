@@ -739,7 +739,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
         const cached=cachedEntry ? new Uint8ClampedArray(cachedEntry.data) : null
         const workerData=cached??input.data
         const correctionData = colorCorrection.current?.width === width && colorCorrection.current.height === height ? new Uint8Array(colorCorrection.current.data) : undefined
-        const message = { data: workerData, colorCorrection: correctionData, preprocessed: !!cached, preprocessedNeuralScale:cachedEntry?.neuralScale, width, height, sourceWidth: input.width, sourceHeight: input.height, compareBackground:comparisonTarget==='background',settings: { ...settings, separateBackground:true,screenBase:garment==='dark'?'black':'white',dpi } }
+        const message = { data: workerData, colorCorrection: correctionData, preprocessed: !!cached, preprocessedNeuralScale:cachedEntry?.neuralScale, width, height, sourceWidth: input.width, sourceHeight: input.height, assetOrigin:window.location.origin,compareBackground:comparisonTarget==='background',settings: { ...settings, separateBackground:true,screenBase:garment==='dark'?'black':'white',dpi } }
         worker.postMessage(message, correctionData ? [workerData.buffer, correctionData.buffer] : [workerData.buffer])
         native.width = native.height = 1
       } catch (e) { if (!cancelled) setError((e as Error).message) }
