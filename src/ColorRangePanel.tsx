@@ -20,8 +20,13 @@ export default function ColorRangePanel({image,crop,initial,onApply,onCancel,pur
   const history=useRef<ColorRange[]>([])
   const baseImage=processedSource?.width?processedSource:image
   const region=processedSource?.width?{x:0,y:0,width:processedSource.width,height:processedSource.height}:crop??{x:0,y:0,width:image.naturalWidth,height:image.naturalHeight}
-  const scale=Math.min(520/region.width,400/region.height,1)
-  const width=Math.max(1,Math.round(region.width*scale)),height=Math.max(1,Math.round(region.height*scale))
+  // Keep a detailed backing canvas for zoom, while the initial view still fits
+  // comfortably in the dialog. The previous 520px bitmap was simply enlarged.
+  const displayScale=Math.min(520/region.width,400/region.height,1)
+  const renderScale=Math.min(1200/region.width,900/region.height,1)
+  const width=Math.max(1,Math.round(region.width*renderScale)),height=Math.max(1,Math.round(region.height*renderScale))
+  const displayWidth=Math.max(1,Math.round(region.width*displayScale)),displayHeight=Math.max(1,Math.round(region.height*displayScale))
+  const [cursor,setCursor]=useState<{x:number;y:number}|null>(null)
   useEffect(()=>{const previous=document.activeElement as HTMLElement|null;dialog.current?.focus();return()=>previous?.focus()},[])
   useEffect(()=>{
     const frame=requestAnimationFrame(()=>{
@@ -69,10 +74,12 @@ export default function ColorRangePanel({image,crop,initial,onApply,onCancel,pur
   function paint(e:React.PointerEvent<HTMLCanvasElement>,start=false){
     if(!screening||tool==='sample'||(start&&e.button!==0)||(!start&&point.current?.id!==e.pointerId))return
     e.preventDefault();const box=e.currentTarget.getBoundingClientRect()
+    const wrap=e.currentTarget.parentElement
+    setCursor({x:e.clientX-box.left+(wrap?.scrollLeft??0),y:e.clientY-box.top+(wrap?.scrollTop??0)})
     const x=Math.max(0,Math.min(1,(e.clientX-box.left)/box.width)),y=Math.max(0,Math.min(1,(e.clientY-box.top)/box.height))
     if(start){saveHistory();e.currentTarget.setPointerCapture(e.pointerId)}
     const previous=start?{x,y}:point.current!
-    setRange(r=>(r.strokes?.length??0)>=20000?r:{...r,strokes:[...(r.strokes??[]),{x:previous.x,y:previous.y,toX:x,toY:y,radius:Math.min(1,size/(2*width*zoom)),erase:tool==='erase'}]})
+    setRange(r=>(r.strokes?.length??0)>=20000?r:{...r,strokes:[...(r.strokes??[]),{x:previous.x,y:previous.y,toX:x,toY:y,radius:Math.min(1,size/(2*displayWidth*zoom)),erase:tool==='erase'}]})
     point.current={x,y,id:e.pointerId}
   }
   const title=purpose==='affected'?'Dónde aplicar trama':purpose==='protected'?'Dónde conservar sin trama':'1. Eliminar fondo'
@@ -94,8 +101,8 @@ export default function ColorRangePanel({image,crop,initial,onApply,onCancel,pur
       <div className="range-zoom"><button className="btn" aria-label="Alejar selección" disabled={zoom===1} onClick={()=>setZoom(z=>z/2)}>−</button><output>{zoom}×</output><button className="btn" aria-label="Acercar selección" disabled={zoom===8} onClick={()=>setZoom(z=>z*2)}>+</button><button className="btn" onClick={()=>setZoom(1)}>Ajustar</button></div>
     </div>
     <div className="range-preview-grid">
-      <figure><figcaption>{screening?'Después de borrar fondo · pinta aquí':'Original · toma un color'}</figcaption><div className="range-canvas-wrap range-source-wrap"><canvas ref={left} style={{width:width*zoom,height:height*zoom,touchAction:tool==='sample'?'auto':'none',cursor:'crosshair'}} onClick={sample} onPointerDown={e=>paint(e,true)} onPointerMove={e=>paint(e)} onPointerUp={()=>{point.current=null}} onPointerCancel={()=>{point.current=null}} onLostPointerCapture={()=>{point.current=null}} aria-label="Lienzo de selección"/></div></figure>
-      <figure><figcaption>{view==='mask'?'Máscara · blanco seleccionado':view==='background'?'Antes de la trama':screening?'Resultado con trama':'Fondo eliminado'}</figcaption><div className="range-canvas-wrap range-source-wrap"><canvas ref={right} style={{width:width*zoom,height:height*zoom}} aria-label="Vista previa del resultado"/></div></figure>
+      <figure><figcaption>{screening?'Después de borrar fondo · pinta aquí':'Original · toma un color'}</figcaption><div className="range-canvas-wrap range-source-wrap"><canvas ref={left} style={{width:displayWidth*zoom,height:displayHeight*zoom,touchAction:tool==='sample'?'auto':'none',cursor:tool==='sample'?'crosshair':'none'}} onClick={sample} onPointerDown={e=>paint(e,true)} onPointerMove={e=>paint(e)} onPointerEnter={e=>{if(tool!=='sample'){const box=e.currentTarget.getBoundingClientRect(),wrap=e.currentTarget.parentElement;setCursor({x:e.clientX-box.left+(wrap?.scrollLeft??0),y:e.clientY-box.top+(wrap?.scrollTop??0)})}}} onPointerLeave={()=>setCursor(null)} onPointerUp={()=>{point.current=null}} onPointerCancel={()=>{point.current=null;setCursor(null)}} onLostPointerCapture={()=>{point.current=null}} aria-label="Lienzo de selección"/>{screening&&tool!=='sample'&&cursor&&<span className={`brush-cursor ${tool==='erase'?'erase':''}`} style={{width:size,height:size,left:cursor.x,top:cursor.y}} aria-hidden="true"/>}</div></figure>
+      <figure><figcaption>{view==='mask'?'Máscara · blanco seleccionado':view==='background'?'Antes de la trama':screening?'Resultado con trama':'Fondo eliminado'}</figcaption><div className="range-canvas-wrap range-source-wrap"><canvas ref={right} style={{width:displayWidth*zoom,height:displayHeight*zoom}} aria-label="Vista previa del resultado"/></div></figure>
     </div>
     {range.useColors!==false&&<><div className="range-swatches">{range.colors.map((color,i)=><label key={i}>Muestra {i+1}<input type="color" value={color} onChange={e=>setRange(r=>({...r,colors:r.colors.map((c,j)=>j===i?e.target.value:c)}))}/><span>{color.toUpperCase()}</span></label>)}{screening&&<button className="text-button" onClick={()=>{saveHistory();setRange(r=>({...r,useColors:false}))}}>Quitar selección por color</button>}</div><div className="dimension-fields">{(['tolerance','softness'] as const).map((key,i)=><label className="range-control" key={key}><span><b>{i?'Transición suave':'Tolerancia de color'}</b><output>{range[key]}%</output></span><input type="range" min="0" max="100" value={range[key]} onChange={e=>setRange(r=>({...r,[key]:Number(e.target.value)}))}/></label>)}</div></>}
     <p className="help-text" role="status">{screening?`${stats.selected.toLocaleString('es-CL')} píxeles seleccionados de ${stats.visible.toLocaleString('es-CL')} visibles en esta vista. ${stats.holes.toLocaleString('es-CL')} huecos de trama.`:`${stats.removed.toLocaleString('es-CL')} píxeles de fondo eliminados en esta vista.`} {message}</p>
