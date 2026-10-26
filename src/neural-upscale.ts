@@ -64,7 +64,11 @@ async function runUpscale(
   const outputWidth = width * scale, outputHeight = height * scale
   const output = new Uint8ClampedArray(outputWidth * outputHeight * 4)
   const inputName = session.inputNames[0], outputName = session.outputNames[0]
-  const tile = width * height > 500_000 ? 256 : 512
+  // Larger tiles avoid paying the model/session overhead once per tiny block.
+  // x4 keeps a slightly smaller tile because its intermediate tensor is four
+  // times wider and taller than the source; 256 made large images needlessly
+  // expensive in the single-threaded WASM backend.
+  const tile = scale === 4 ? 384 : 512
   const tileCount = Math.ceil(width / tile) * Math.ceil(height / tile)
   let finished = 0
   for (let y = 0; y < height; y += tile) for (let x = 0; x < width; x += tile) {
