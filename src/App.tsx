@@ -1244,7 +1244,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           {processing && <div className="processing stage-processing" role="status" aria-live="polite">
             <span className="processing-spinner" />
             <div className="processing-content">
-              <div className="processing-label">{processingLabel} <b>{processingProgress}%</b>{neuralProcessing&&processingProgress<63&&<small> Puede tardar entre 30 segundos y 2 minutos.</small>}</div>
+              <div className="processing-label">{processingLabel} <b>{processingProgress}%</b>{neuralProcessing&&processingProgress<63&&<small> Neural se limita a imágenes pequeñas; las grandes usan Lanczos.</small>}</div>
               <div className="processing-progress" role="progressbar" aria-label="Progreso del procesamiento" aria-valuemin={0} aria-valuemax={100} aria-valuenow={processingProgress}><i style={{ width: `${processingProgress}%` }} /></div>
             </div>
             <button type="button" className="processing-stop" onClick={stopProcessing}>Detener</button>

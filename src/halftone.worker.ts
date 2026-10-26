@@ -18,8 +18,12 @@ self.onmessage = async (event) => {
     const neuralRequested = settings.resampleMethod === 'neural2' || settings.resampleMethod === 'neural4'
     let neural: Uint8ClampedArray | null = null
     if (neuralRequested) {
-      if (sourceWidth * sourceHeight * neuralScale * neuralScale > 48_000_000) {
-        warning = `Neural ×${neuralScale} no se aplicó: generaría más de 48 megapíxeles intermedios. Se usó Lanczos-3 para evitar un error de memoria.`
+      // Real-ESRGAN in a browser can become unreasonably slow on the CPU
+      // fallback. Keep the experimental path bounded so a large artwork does
+      // not appear frozen for many minutes before producing no visible gain.
+      const neuralIntermediatePixels = sourceWidth * sourceHeight * neuralScale * neuralScale
+      if (neuralIntermediatePixels > 4_000_000) {
+        warning = `Neural ×${neuralScale} no se aplicó: esta imagen generaría ${Math.round(neuralIntermediatePixels / 1_000_000)} MP intermedios. Se usó Lanczos-3 para mantener un tiempo razonable.`
       } else {
         try { neural = await neuralUpscaleRgba(data, sourceWidth, sourceHeight, neuralScale, fraction => progress(8 + Math.round(54 * fraction)),event.data.assetOrigin); if (neural) appliedNeuralScale = neuralScale }
         catch (error) { warning = `Neural ×${neuralScale} no pudo ejecutarse; se usó Lanczos-3 como respaldo.${error instanceof Error ? ` Detalle: ${error.message}` : ''}` }
