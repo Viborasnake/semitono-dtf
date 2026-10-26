@@ -37,6 +37,14 @@ export async function neuralUpscaleRgba(data: Uint8ClampedArray, width: number, 
   if (typeof navigator !== 'undefined' && 'gpu' in navigator) {
     try {
       const ort = await import('onnxruntime-web/webgpu')
+      const {default:wasmUrl}=await import('./ort-webgpu-wasm-url')
+      // Inline workers have a blob URL. Configure the GPU runtime before
+      // session creation too, otherwise its relative WASM URL fails and the
+      // entire image silently falls back to CPU.
+      ort.env.wasm.numThreads = 1
+      const response=await fetch(absoluteAssetUrl(wasmUrl,assetOrigin))
+      if(!response.ok)throw new Error(`No se pudo cargar el motor WebGPU (${response.status}).`)
+      ort.env.wasm.wasmBinary=new Uint8Array(await response.arrayBuffer())
       return await runUpscale(ort, 'webgpu', modelUrl, data, width, height, scale, onProgress)
     } catch {
       // WebGPU can be exposed but unavailable for this model/device.
