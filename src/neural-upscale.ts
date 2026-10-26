@@ -9,6 +9,21 @@ export function sourceIsNeutral(r: number, g: number, b: number) {
   return peak < 48 || peak - Math.min(r, g, b) <= 12
 }
 
+// Positive bilinear sampling of premultiplied RGB and alpha. Neural models do
+// not predict transparency, so the source alpha must be enlarged separately;
+// nearest-neighbour alpha produced blocky outlines and exposed invented colour.
+export function sampleUpscaledEdge(data:Uint8ClampedArray,width:number,height:number,x:number,y:number,scale:2|4){
+  const sx=(x+.5)/scale-.5,sy=(y+.5)/scale-.5
+  const x0=Math.floor(sx),y0=Math.floor(sy),fx=sx-x0,fy=sy-y0
+  let alpha=0,red=0,green=0,blue=0
+  for(let oy=0;oy<2;oy++)for(let ox=0;ox<2;ox++){
+    const px=Math.max(0,Math.min(width-1,x0+ox)),py=Math.max(0,Math.min(height-1,y0+oy))
+    const weight=(ox?fx:1-fx)*(oy?fy:1-fy),i=(py*width+px)*4,a=data[i+3]/255
+    alpha+=a*weight;red+=data[i]*a*weight;green+=data[i+1]*a*weight;blue+=data[i+2]*a*weight
+  }
+  return alpha>1e-8?{r:red/alpha,g:green/alpha,b:blue/alpha,a:alpha*255}:{r:0,g:0,b:0,a:0}
+}
+
 // Experimental CPU/WASM path. Tiles keep peak memory bounded and the padded
 // overlap prevents visible seams when the model sees a tile boundary.
 export async function neuralUpscaleRgba(data: Uint8ClampedArray, width: number, height: number, scale: 2 | 4, onProgress?: (fraction: number) => void) {
@@ -56,10 +71,9 @@ async function runUpscale(
       const sy = Math.min(height - 1, Math.max(0, y + py - PAD))
       const source = (sy * width + sx) * 4
       const target = py * paddedWidth + px
-      const alpha = data[source + 3] / 255
-      input[target] = data[source] / 255 * alpha
-      input[paddedWidth * paddedHeight + target] = data[source + 1] / 255 * alpha
-      input[2 * paddedWidth * paddedHeight + target] = data[source + 2] / 255 * alpha
+      input[target] = data[source] / 255
+      input[paddedWidth * paddedHeight + target] = data[source + 1] / 255
+      input[2 * paddedWidth * paddedHeight + target] = data[source + 2] / 255
     }
     const inputTensor = new ort.Tensor('float32', input, [1, 3, paddedHeight, paddedWidth])
     const result = await session.run({[inputName]: inputTensor})
@@ -78,12 +92,15 @@ async function runUpscale(
         const red = Math.max(0, Math.min(255, Math.round(values[source] * 255)))
         const green = Math.max(0, Math.min(255, Math.round(values[plane + source] * 255)))
         const blue = Math.max(0, Math.min(255, Math.round(values[plane * 2 + source] * 255)))
-        if (sourceIsNeutral(data[original], data[original + 1], data[original + 2])) {
+        const edge=sampleUpscaledEdge(data,width,height,ox+dx,oy+dy,scale)
+        if(edge.a<254){
+          output[target]=edge.r;output[target+1]=edge.g;output[target+2]=edge.b
+        } else if (sourceIsNeutral(data[original], data[original + 1], data[original + 2])) {
           output[target] = output[target + 1] = output[target + 2] = Math.round((red + green + blue) / 3)
         } else {
           output[target] = red; output[target + 1] = green; output[target + 2] = blue
         }
-        output[target + 3] = data[original + 3]
+        output[target + 3] = edge.a
       }
     }
     tensor.dispose()

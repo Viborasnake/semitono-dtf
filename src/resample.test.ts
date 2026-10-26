@@ -15,6 +15,17 @@ test('transparent black does not darken colored edges when enlarged',()=>{
   const out=resizeRgba(source,2,1,8,4)
   for(let i=0;i<out.length;i+=4)if(out[i+3])assert.equal(out[i],255)
 })
+test('Lanczos does not invent coloured outlines across transparency',()=>{
+  const source=new Uint8ClampedArray([
+    245,20,170,255, 245,20,170,255, 0,0,0,0, 0,0,0,0,
+  ])
+  const out=resizeRgba(source,4,1,32,1,'lanczos3')
+  for(let i=0;i<out.length;i+=4)if(out[i+3]){
+    assert.equal(out[i],245)
+    assert.equal(out[i+1],20)
+    assert.equal(out[i+2],170)
+  }
+})
 test('all resize methods produce the requested dimensions',()=>{
   const source=new Uint8ClampedArray(3*2*4).fill(255)
   for(const method of ['lanczos3','bicubic','bilinear','nearest'] as const){

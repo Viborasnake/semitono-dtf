@@ -18,8 +18,8 @@ self.onmessage = async (event) => {
     const neuralRequested = settings.resampleMethod === 'neural2' || settings.resampleMethod === 'neural4'
     let neural: Uint8ClampedArray | null = null
     if (neuralRequested) {
-      if (sourceWidth * sourceHeight > 4_000_000) {
-        warning = 'La imagen es demasiado grande para Neural; se usó Lanczos-3 para evitar un error de memoria.'
+      if (sourceWidth * sourceHeight * neuralScale * neuralScale > 48_000_000) {
+        warning = `Neural ×${neuralScale} no se aplicó: generaría más de 48 megapíxeles intermedios. Se usó Lanczos-3 para evitar un error de memoria.`
       } else {
         try { neural = await neuralUpscaleRgba(data, sourceWidth, sourceHeight, neuralScale, fraction => progress(8 + Math.round(54 * fraction))); if (neural) appliedNeuralScale = neuralScale }
         catch (error) { warning = `Neural no pudo procesar esta imagen; se usó Lanczos-3 como respaldo.${import.meta.env.DEV && error instanceof Error ? ` ${error.message}` : ''}` }
@@ -27,7 +27,8 @@ self.onmessage = async (event) => {
     }
       progress(neural ? 62 : 42)
       const neuralWidth = sourceWidth * neuralScale, neuralHeight = sourceHeight * neuralScale
-      resized = sharpenRgba(neural ? resizeRgba(neural, neuralWidth, neuralHeight, width, height, 'lanczos3') : resizeRgba(data, sourceWidth, sourceHeight, width, height, 'lanczos3'), width, height, settings.sharpness)
+      const fallbackMethod=neuralRequested?'lanczos3':settings.resampleMethod
+      resized = sharpenRgba(neural ? resizeRgba(neural, neuralWidth, neuralHeight, width, height, 'lanczos3') : resizeRgba(data, sourceWidth, sourceHeight, width, height, fallbackMethod), width, height, settings.sharpness)
     }
     progress(76)
     const result = processImage(resized,width,height,settings,event.data.colorCorrection,event.data.compareBackground)

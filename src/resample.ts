@@ -55,9 +55,27 @@ export function resizeRgba(data: Uint8ClampedArray, sw: number, sh: number, dw: 
   const horizontal=new Uint8ClampedArray(dw*sh*4)
   const result=new Uint8ClampedArray(dw*dh*4)
   function sample(input:Uint8ClampedArray,output:Uint8ClampedArray,out:number,taps:{index:number;weight:number}[],index:(p:number)=>number){
-    let r=0,g=0,b=0,a=0,total=0
-    for(const tap of taps){const i=index(tap.index),aw=input[i+3]/255*tap.weight;total+=tap.weight;a+=aw;r+=input[i]*aw;g+=input[i+1]*aw;b+=input[i+2]*aw}
-    if(a>1e-8 && total>1e-8){output[out]=r/a;output[out+1]=g/a;output[out+2]=b/a;output[out+3]=Math.max(0,Math.min(1,a/total))*255}
+    let minAlpha=1,maxAlpha=0
+    for(const tap of taps){const alpha=input[index(tap.index)+3]/255;minAlpha=Math.min(minAlpha,alpha);maxAlpha=Math.max(maxAlpha,alpha)}
+    // Negative Lanczos lobes are useful inside opaque artwork, but across an
+    // alpha edge they create visible colour/alpha ringing outside the cutout.
+    // Use only the positive part of the kernel for mixed-alpha samples.
+    const alphaEdge=maxAlpha-minAlpha>1/255
+    let r=0,g=0,b=0,a=0,total=0,minR=255,minG=255,minB=255,maxR=0,maxG=0,maxB=0,contributors=0
+    for(const tap of taps){
+      const weight=alphaEdge?Math.max(0,tap.weight):tap.weight
+      if(!weight)continue
+      const i=index(tap.index),alpha=input[i+3]/255,aw=alpha*weight
+      total+=weight;a+=aw;r+=input[i]*aw;g+=input[i+1]*aw;b+=input[i+2]*aw
+      if(alpha>0&&weight>0){minR=Math.min(minR,input[i]);minG=Math.min(minG,input[i+1]);minB=Math.min(minB,input[i+2]);maxR=Math.max(maxR,input[i]);maxG=Math.max(maxG,input[i+1]);maxB=Math.max(maxB,input[i+2]);contributors++}
+    }
+    if(a>1e-8 && total>1e-8){
+      const clamp=(value:number,min:number,max:number)=>Math.max(min,Math.min(max,value))
+      output[out]=contributors?clamp(r/a,minR,maxR):r/a
+      output[out+1]=contributors?clamp(g/a,minG,maxG):g/a
+      output[out+2]=contributors?clamp(b/a,minB,maxB):b/a
+      output[out+3]=Math.max(0,Math.min(1,a/total))*255
+    }
   }
   for(let y=0;y<sh;y++)for(let x=0;x<dw;x++)sample(data,horizontal,(y*dw+x)*4,tx[x],p=>(y*sw+p)*4)
   for(let y=0;y<dh;y++)for(let x=0;x<dw;x++)sample(horizontal,result,(y*dw+x)*4,ty[y],p=>(p*dw+x)*4)

@@ -1004,6 +1004,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               <span>Original: {resizeInfo.sourceWidth.toLocaleString()} × {resizeInfo.sourceHeight.toLocaleString()} px</span>
               <span>Salida: {resizeInfo.outputWidth.toLocaleString()} × {resizeInfo.outputHeight.toLocaleString()} px · {resizeInfo.percent.toFixed(1)}%</span>
               <span>Método: {({lanczos3:'Lanczos-3',bicubic:'Bicúbico',bilinear:'Bilineal',nearest:'Vecino más cercano',neural2:'Neural x2 experimental',neural4:'Neural x4 experimental'} as Record<ResizeMethod,string>)[settings.resampleMethod]} · Se aplica antes del semitono</span>
+              {(settings.resampleMethod==='neural2'||settings.resampleMethod==='neural4')&&<span>{processing?'Neural: procesando modelo…':readyKey===renderKey?(appliedNeuralScale>1?`Neural ×${appliedNeuralScale}: aplicado y visible en la comparación Reescalado.`:`Neural: ${exportMessage||'no se aplicó; se usó Lanczos-3.'}`):'Neural: esperando actualización.'}</span>}
             </div>}
             <p className="help-text">La ampliación aumenta los píxeles de salida, pero no recupera detalle que no exista en el original.</p>
             <RangeControl label="Nitidez post-reescalado" value={settings.sharpness} min={0} max={100} unit="%" onChange={v => update('sharpness', v)} />

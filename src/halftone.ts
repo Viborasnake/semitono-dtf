@@ -72,10 +72,11 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
   const samples = offsets.length ** 2
   const organic=Math.max(0,Math.min(100,s.organic??0))/100*.18
   const hash=(a:number,b:number)=>{const n=Math.sin(a*127.1+b*311.7)*43758.5453;return n-Math.floor(n)}
-  // With no background removal, barely-visible export residue has no colour
-  // cue to distinguish it from the artwork. Do not promote alpha 1–8/255 to
-  // opaque ink when continuous solid-alpha output is requested.
-  const discardWeakSourceAlpha = s.enabled === false && s.solidAlpha === true && processingBackground === 'none'
+  // Never promote barely-visible export residue to fully opaque DTF ink. This
+  // matters for both continuous and screened output: many cutout PNGs contain
+  // colourful alpha 1–8 pixels that are invisible on dark backgrounds but turn
+  // into a bright outline when solid alpha is requested.
+  const discardWeakSourceAlpha = solidAlpha
   // In continuous solid-alpha mode, isolated low-level JPEG/compression noise
   // must not become opaque ink. Keep weak pixels only when they touch a real
   // foreground pixel, which preserves anti-aliased contours without retaining

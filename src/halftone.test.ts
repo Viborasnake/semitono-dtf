@@ -267,6 +267,15 @@ test('continuous solid alpha without removal ignores near-transparent export res
  const out=halftone(data,2,1,{...settings,enabled:false,background:'none',solidAlpha:true}).data
  assert.deepEqual(Array.from(out),[0,0,0,0,255,255,255,255])
 })
+test('screened solid alpha does not turn near-transparent colour residue into a border',()=>{
+ const data=new Uint8ClampedArray([
+  255,0,180,8,
+  255,0,180,9,
+ ])
+ const out=halftone(data,2,1,{...settings,enabled:true,background:'none',solidAlpha:true,size:125}).data
+ assert.equal(out[3],0)
+ assert.ok(out[7]===0||out[7]===255)
+})
 test('continuous solid alpha removes weak matte residue instead of promoting it to opaque ink',()=>{
  const data=image(255,255,255)
  data.set([20,20,20,255],0)
