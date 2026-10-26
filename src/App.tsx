@@ -22,7 +22,7 @@ import HalftoneWorker from './halftone.worker?worker&inline'
 
 type Shape = 'circle' | 'square' | 'line'
 type ViewMode = 'result' | 'split' | 'original'
-type ComparisonTarget = 'result' | 'rescale'
+type ComparisonTarget = 'result' | 'rescale' | 'background'
 type WorkflowDestination = {step: 1 | 2 | 3 | 4 | 5; panel?: 'size' | 'garment' | 'retoque' | 'trama' | 'refinamiento'; tool: 'design' | 'gang'}
 type PrintReviewAction = 'export' | 'resized' | 'gang'
 
@@ -45,6 +45,8 @@ export type Settings = {
   tolerance: number
   enabled: boolean
   screenScope: 'transitions' | 'all'
+  separateBackground?: boolean
+  screenBase?: 'black'|'white'
   affectedColors?: ColorRange
   protectedColors?: ColorRange
   organic?: number
@@ -95,6 +97,8 @@ const defaults: Settings = {
   tolerance: 25,
   enabled: true,
   screenScope: 'all',
+  separateBackground:true,
+  screenBase:'black',
   featherMm: 0,
   cornerRadiusMm: 0,
   trimMm: 0,
@@ -556,6 +560,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   }
   const chooseGarment = (tone:GarmentTone) => {
     setGarment(tone)
+    setSettings(s=>({...s,screenBase:tone==='dark'?'black':'white'}))
     setPreviewBg(tone==='light'?'white':'black')
     setPreset('custom')
   }
@@ -613,7 +618,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     outputHeight: output.height,
     percent: output.width / dimensions.width * 100,
   } : null
-  const renderKey = JSON.stringify([imageVersion, output?.width, output?.height, dpi, settings,crop,colorCorrectionVersion])
+  const renderKey = JSON.stringify([imageVersion, output?.width, output?.height, dpi, settings,crop,colorCorrectionVersion,garment,comparisonTarget==='background'])
   const resizeKey = JSON.stringify([imageVersion, output?.width, output?.height, dpi, settings.resampleMethod, settings.sharpness, crop])
   const processing = loading || (!!output && readyKey !== renderKey && !error)
   const visibleSize=displaySize ?? dimensions
@@ -696,6 +701,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             // Resize only when the replacement is ready: resizing clears canvas pixels.
             const originalPixels=new ImageData(data.original,width,height)
             const resultPixels=new ImageData(data.data,width,height)
+            if(data.background){original.width=width;original.height=height;original.getContext('2d')!.putImageData(new ImageData(data.background,width,height),0,0)}
             resizedCache.current={key:resizeKey,data:new Uint8ClampedArray(data.original),width,height,neuralScale:data.neuralScale ?? 1}
             setAppliedNeuralScale(data.neuralScale ?? 1)
             src.width = out.width = width
@@ -729,7 +735,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
         const cached=cachedEntry ? new Uint8ClampedArray(cachedEntry.data) : null
         const workerData=cached??input.data
         const correctionData = colorCorrection.current?.width === width && colorCorrection.current.height === height ? new Uint8Array(colorCorrection.current.data) : undefined
-        const message = { data: workerData, colorCorrection: correctionData, preprocessed: !!cached, preprocessedNeuralScale:cachedEntry?.neuralScale, width, height, sourceWidth: input.width, sourceHeight: input.height, settings: { ...settings, dpi } }
+        const message = { data: workerData, colorCorrection: correctionData, preprocessed: !!cached, preprocessedNeuralScale:cachedEntry?.neuralScale, width, height, sourceWidth: input.width, sourceHeight: input.height, compareBackground:comparisonTarget==='background',settings: { ...settings, separateBackground:true,screenBase:garment==='dark'?'black':'white',dpi } }
         worker.postMessage(message, correctionData ? [workerData.buffer, correctionData.buffer] : [workerData.buffer])
         native.width = native.height = 1
       } catch (e) { if (!cancelled) setError((e as Error).message) }
@@ -1037,13 +1043,16 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               {settings.enabled ? <>
               <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('trama')}>Restablecer valores</button>
               <div className="preset-group"><span className="preset-group-label">Control de trama</span>
-                <label className="field">Origen del degradado<select value={settings.screenScope} onChange={e=>chooseScreenScope(e.target.value as Settings['screenScope'])}><option value="all">Tonos de la imagen</option><option value="transitions">Transparencias y transición del fondo</option></select></label>
-                <button className="btn color-range-trigger" onClick={()=>setTramaColorPick('affected')}><Pipette size={16}/> Colores afectados · {settings.affectedColors?'Editar selección':'Todos'}</button>
-                {settings.affectedColors&&<><p className="help-text">Con trama: {settings.affectedColors.colors.join(', ')}. Los demás colores quedan sólidos.</p><button className="text-button" onClick={()=>update('affectedColors',undefined)}>Afectar todos los colores</button></>}
-                <button className="btn color-range-trigger" onClick={()=>setTramaColorPick('protected')}><Pipette size={16}/> Colores protegidos · {settings.protectedColors?'Editar selección':'Sin selección'}</button>
-                {settings.protectedColors&&<><p className="help-text">Sin trama: {settings.protectedColors.colors.join(', ')}. La protección tiene prioridad.</p><button className="text-button" onClick={()=>update('protectedColors',undefined)}>Quitar protección de trama</button></>}
+                <p className="help-text">2. Aplica la trama al diseño que quedó tras borrar el fondo. Las zonas protegidas conservan su color y no recuperan el fondo eliminado.</p>
+                <label className="field">Cómo generar los puntos<select value={settings.affectedColors?'all':settings.screenScope} disabled={!!settings.affectedColors} onChange={e=>chooseScreenScope(e.target.value as Settings['screenScope'])}><option value="all">Según los tonos del diseño</option><option value="transitions">Sólo transparencias suaves</option></select></label>
+                <button className="btn color-range-trigger" disabled={processing} onClick={()=>setTramaColorPick('affected')}><Pipette size={16}/> {settings.affectedColors?'Editar zonas con trama':'Elegir zonas con trama'}</button>
+                <p className="help-text">{settings.affectedColors?'Trama sólo en tu selección; el resto conserva su color.':'Trama en todo el diseño visible.'}</p>
+                {settings.affectedColors&&<button className="text-button" onClick={()=>update('affectedColors',undefined)}>Volver a tramar todo</button>}
+                <button className="btn color-range-trigger" disabled={processing} onClick={()=>setTramaColorPick('protected')}><Pipette size={16}/> {settings.protectedColors?'Editar zonas protegidas':'Proteger zonas sin trama'}</button>
+                {settings.protectedColors&&<><p className="help-text">Protección activa: tiene prioridad donde se superponen las selecciones.</p><button className="text-button" onClick={()=>update('protectedColors',undefined)}>Quitar protección de trama</button></>}
               </div>
-              <p className="help-text">Selecciona varias muestras con el gotero y ajusta tolerancia y suavidad en la máscara. La selección afecta todas las zonas del mismo color. El fondo eliminado permanece transparente.</p>
+              <button className="btn" disabled={processing} onClick={()=>{setComparisonTarget('background');setView('split')}}>Comparar fondo eliminado / trama</button>
+              <button className="text-button" onClick={()=>{setSettings(s=>({...s,affectedColors:undefined,protectedColors:undefined,protectSolid:false,screenScope:'all',size:100,contrast:100,brightness:100,gamma:1,invert:false,organic:0}));setPreset('custom');setView('result');setComparisonTarget('result')}}>Reiniciar selección y tono de trama</button>
               <RangeControl label="Irregularidad de los puntos" value={settings.organic??0} min={0} max={100} unit="%" onChange={v=>update('organic',v)}/>
               <p className="help-text">0%: trama regular. Aumenta para desplazar suavemente los puntos y reducir la apariencia de rejilla. Revisa los detalles al 100%.</p>
               <RangeControl label="Frecuencia" value={settings.lpi} min={12} max={65} unit=" LPI" onChange={(v) => update('lpi', v)} />
@@ -1058,22 +1067,20 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               <p className="help-text">Mantiene el color original en los puntos. Desactívalo para generar una tinta única según la prenda.</p>
               <div className="row-label"><span>Invertir trama</span><Toggle checked={settings.invert} onChange={v => update('invert', v)} /></div>
               <p className="help-text">Invierte las zonas de tinta y transparencia del semitono.</p>
-              {settings.background==='white'&&settings.whiteRemoval!=='connected'&&settings.enabled&&settings.preserveColor&&<><RangeControl label="Conservar detalle" value={settings.whiteDetail??0} min={0} max={100} unit="%" onChange={v=>update('whiteDetail',v)}/><p className="help-text">0%: trama tonal sin refuerzo. Aumentarlo refuerza la cobertura según el tono, sin convertir toda la imagen en color continuo. Compensa el color para conservar aproximadamente el tono medio sobre blanco con ajustes neutros.</p></>}
               </> : <p className="help-text">Sin semitono conserva la imagen que quedó tras eliminar el fondo. Puedes volver a activar Semitono sin perder el color de prenda ni la selección del gotero.</p>}
             </div>
           </section>
 
           <section className={`control-card ${collapsedPanels.background ? '' : 'open'}`}><button className="section-heading" data-flow-order="3" aria-expanded={!collapsedPanels.background} aria-controls="background-controls" onClick={()=>togglePanel('background')}><span><Eraser size={17} /> Eliminar fondo</span><ChevronDown size={17}/></button><div className="section-body" id="background-controls" hidden={collapsedPanels.background}>
             <button type="button" className="text-button panel-reset" onClick={()=>resetPanel('background')}>Restablecer valores</button>
+            <p className="help-text">1. Borra únicamente el fondo que no se imprimirá. Este paso cambia la transparencia; no genera puntos. Luego elige las zonas con trama en Semitono.</p>
             <div className="segmented"><button className={settings.background === 'black' ? 'active' : ''} onClick={() => update('background', 'black')}>Negro</button><button className={settings.background === 'white' ? 'active' : ''} onClick={() => update('background', 'white')}>Blanco</button><button className={settings.background === 'none' ? 'active' : ''} onClick={() => update('background', 'none')}>Ninguno</button></div>
             {!settings.enabled && <><div className="row-label"><span>Alfa sólido (DTF)</span><Toggle checked={settings.solidAlpha} onChange={v => update('solidAlpha', v)} /></div><p className="help-text">Activo: todo píxel visible se exporta opaco (alfa 255); las zonas ya transparentes y el fondo eliminado permanecen transparentes. Úsalo para DTF si no necesitas transparencias suaves.</p></>}
             <button className={`btn color-range-trigger ${settings.background==='custom'?'active':''}`} disabled={!fileName||loading} onClick={()=>{setIsolatedColorPick(false);setShowColorRange(true)}}><Pipette size={16}/><span>{settings.background==='custom'?'Editar color del sustrato…':'Gotero · Color del sustrato…'}</span></button>
-            {settings.background==='custom'&&<p className="help-text">Color del sustrato activo · {settings.colorRange?.colors.join(', ')}. Tolerancia {settings.colorRange?.tolerance}%. Primero se elimina esa selección y después se aplica {settings.screenScope==='transitions'?'el semitono sólo a su transición':'el semitono al diseño restante'}, para prenda {settings.customBase==='black'?'oscura':'clara'}.</p>}
-            {settings.background === 'black' && <RangeControl label="Eliminar sombras" value={settings.tolerance} min={0} max={100} onChange={(v) => update('tolerance', v)} />}
-            {settings.background==='black'&&settings.enabled&&settings.preserveColor&&<><RangeControl label="Limpiar ruido en sombras" value={settings.backgroundCleanup??0} min={0} max={100} unit="%" onChange={v=>{update('backgroundCleanup',v);setView('result')}}/><p className="help-text">0%: apagado. Reduce puntos brillantes de color en zonas casi negras, sin desaturar el diseño completo. Puede oscurecer o quitar detalle oscuro real: compara antes de exportar. No afecta los tonos fuera de esa zona.</p></>}
-            {settings.background==='white'&&settings.whiteRemoval!=='connected'&&settings.enabled&&settings.preserveColor&&<><RangeControl label="Limpiar ruido en blancos" value={settings.backgroundCleanup??0} min={0} max={100} unit="%" onChange={v=>{update('backgroundCleanup',v);setView('result')}}/><p className="help-text">0%: apagado. Reduce puntos residuales de color en zonas casi blancas. Puede aclarar o quitar detalles claros reales, incluido el pelaje: compara antes de exportar. No afecta los tonos fuera de esa zona.</p></>}
-            {settings.background === 'white' && <><RangeControl label="Umbral de blancos" value={settings.whiteCutoff} min={170} max={255} onChange={(v) => update('whiteCutoff', v)} />{settings.enabled&&(settings.size>100||settings.gamma>1||settings.brightness>100)&&<p className="help-text warning-inline">Estos ajustes aumentan la cobertura de tinta y pueden oscurecer el resultado sobre blanco. Tamaño 100%, gamma 1 y densidad 100% son el punto de partida neutro.</p>}</>}
-            {settings.background==='white' && <p className="help-text">El blanco de la prenda se conserva como base. Para quitar un color específico del fondo, usa el gotero; así puedes seleccionar tonos crema sin eliminar automáticamente los detalles interiores.</p>}
+            {settings.background==='custom'&&<p className="help-text">Color borrado: {settings.colorRange?.colors.join(', ')}. Tolerancia {settings.colorRange?.tolerance}%. No se elimina ningún otro color automáticamente.</p>}
+            {settings.background === 'black' && <RangeControl label="Tolerancia al negro" value={settings.tolerance} min={0} max={100} onChange={(v) => update('tolerance', v)} />}
+            {settings.background === 'white' && <RangeControl label="Umbral de blancos" value={settings.whiteCutoff} min={170} max={255} onChange={(v) => update('whiteCutoff', v)} />}
+            {settings.background==='white' && <p className="help-text">Elimina los blancos dentro del umbral. Para borrar un tono específico, como crema, usa el gotero. Los colores conservados se mantienen para el paso de trama.</p>}
             <p className="help-text">«Vista sobre» cambia solo la previsualización. La eliminación de fondo se elige aquí.</p>
           </div></section>
 
@@ -1157,10 +1164,11 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               <button className="btn" disabled={loading||!historyCounts.redo} onClick={()=>navigateHistory('redo')} title="Rehacer (⌘/Ctrl Shift Z)">↷ Rehacer</button>
             </div>
             <div className="view-switch">
-              <button className={view === 'original' ? 'active' : ''} onClick={() => setView('original')}><ImageIcon size={15} /> Original</button>
+              <button className={view === 'original' ? 'active' : ''} onClick={() => setView('original')}><ImageIcon size={15} /> {comparisonTarget==='background'?'Fondo eliminado':'Original'}</button>
               <button className={view === 'split' ? 'active' : ''} onClick={() => setView('split')}><Layers3 size={15} /> Comparar</button>
               <button className={view === 'result' ? 'active' : ''} onClick={() => setView('result')}><CircleDot size={15} /> {comparisonTarget === 'rescale' ? 'Reescalada' : 'Resultado'}</button>
               <button type="button" className={comparisonTarget === 'rescale' ? 'active' : ''} aria-label="Comparar original y reescalado" title="Comparar el original con la imagen reescalada" aria-pressed={comparisonTarget === 'rescale'} disabled={!output || processing} onClick={() => {setComparisonTarget(target => target === 'rescale' ? 'result' : 'rescale');setView('split');setBrushTool(false);setColorBrushTool(false);setPickColorTool(false)}}><Layers3 size={15} /> Reescalado</button>
+              <button type="button" className={comparisonTarget==='background'?'active':''} disabled={!output||processing} aria-pressed={comparisonTarget==='background'} onClick={()=>{setComparisonTarget(target=>target==='background'?'result':'background');setView('split')}}>Fondo / trama</button>
             </div>
             <div className="preview-background"><span>Vista sobre</span><select aria-label="Fondo de vista previa" value={previewBg} onChange={(e) => setPreviewBg(e.target.value)}>
               <option value="checker">Transparencia</option>
@@ -1224,7 +1232,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               <canvas ref={originalCanvas} className="art-canvas" style={{ clipPath: view === 'split' ? `inset(0 ${100 - split}% 0 0)` : 'none', visibility: view === 'result' ? 'hidden' : 'visible' }} />
               <div className="result-layer" style={{ clipPath: view === 'split' ? `inset(0 0 0 ${split}%)` : 'none', visibility: view === 'original' ? 'hidden' : 'visible' }}>
                 <canvas ref={sourceCanvas} className="art-canvas" style={{visibility: comparisonTarget === 'rescale' ? 'visible' : 'hidden'}} />
-                <canvas ref={resultCanvas} className="art-canvas" style={{visibility: comparisonTarget === 'result' ? 'visible' : 'hidden'}} />
+                <canvas ref={resultCanvas} className="art-canvas" style={{visibility: comparisonTarget !== 'rescale' ? 'visible' : 'hidden'}} />
               </div>
               {(brushTool || colorBrushTool || pickColorTool) && brushCursor && resultCanvas.current && <div className={`brush-cursor ${pickColorTool ? 'color-picker-cursor' : ''}`} style={{left: brushCursor.x, top: brushCursor.y, width: pickColorTool ? 18 : brushSize * resultCanvas.current.getBoundingClientRect().width / resultCanvas.current.width, height: pickColorTool ? 18 : brushSize * resultCanvas.current.getBoundingClientRect().height / resultCanvas.current.height}} aria-hidden="true" />}
               {view === 'split' && <><div className="split-line" style={{ left: `${split}%` }}><span><Minus /><Minus /></span></div>{!brushTool && !colorBrushTool && !pickColorTool && <input className="split-input" aria-label="Divisor de comparación" type="range" min="0" max="100" value={split} onChange={(e) => setSplit(Number(e.target.value))} />}</>}
@@ -1273,8 +1281,8 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
         </section>
       </div>}
       {showCrop && imageRef.current && <CropPanel image={imageRef.current} initial={crop ?? {x:0,y:0,width:dimensions.width,height:dimensions.height}} onCancel={()=>setShowCrop(false)} onApply={rect=>{setWidthCm((Number(widthCm)*rect.width/dimensions.width).toFixed(4));setDimensions({width:rect.width,height:rect.height});setCrop(rect);setShowCrop(false);setFit(true)}}/>}
-      {tramaColorPick&&imageRef.current&&<ColorRangePanel purpose={tramaColorPick} image={imageRef.current} crop={crop} initial={(tramaColorPick==='affected'?settings.affectedColors:settings.protectedColors)??defaultColorRange} onCancel={()=>setTramaColorPick(null)} onApply={range=>{update(tramaColorPick==='affected'?'affectedColors':'protectedColors',range);setComparisonTarget('result');setView('result');setTramaColorPick(null)}}/>}
-      {showColorRange&&imageRef.current&&<ColorRangePanel purpose={isolatedColorPick?'isolated':'background'} image={imageRef.current} crop={crop} initial={settings.colorRange??{...defaultColorRange,colors:[settings.background==='black'?'#000000':'#ffffff']}} onCancel={()=>{setShowColorRange(false);setIsolatedColorPick(false)}} onApply={colorRange=>{const base=settings.background==='black'||settings.background==='white'?settings.background:activeGarment==='dark'?'black':'white';setGarment(activeGarment);setSettings(s=>({...s,background:'custom',customBase:base,colorRange,preserveColor:true,...(isolatedColorPick?{screenScope:'transitions' as const}:{})}));setPreset('custom');setView('result');setShowColorRange(false);setIsolatedColorPick(false)}}/>}
+      {tramaColorPick&&imageRef.current&&<ColorRangePanel purpose={tramaColorPick} image={imageRef.current} processedSource={sourceCanvas.current} outputWidth={output?.width} settings={{...settings,dpi,screenBase:garment==='dark'?'black':'white'}} crop={crop} initial={(tramaColorPick==='affected'?settings.affectedColors:settings.protectedColors)??{...defaultColorRange,useColors:false,strokes:[]}} onCancel={()=>setTramaColorPick(null)} onApply={range=>{setSettings(s=>({...s,[tramaColorPick==='affected'?'affectedColors':'protectedColors']:range,...(tramaColorPick==='affected'?{screenScope:'all' as const}:{}),separateBackground:true}));setPreset('custom');setComparisonTarget('background');setView('split');setTramaColorPick(null)}}/>}
+      {showColorRange&&imageRef.current&&<ColorRangePanel purpose={isolatedColorPick?'isolated':'background'} image={imageRef.current} processedSource={sourceCanvas.current} outputWidth={output?.width} settings={{...settings,dpi,screenBase:garment==='dark'?'black':'white'}} crop={crop} initial={settings.colorRange??{...defaultColorRange,colors:[settings.background==='black'?'#000000':'#ffffff']}} onCancel={()=>{setShowColorRange(false);setIsolatedColorPick(false)}} onApply={colorRange=>{setSettings(s=>({...s,background:'custom',colorRange,preserveColor:true,separateBackground:true}));setPreset('custom');setComparisonTarget('background');setView('split');setShowColorRange(false);setIsolatedColorPick(false)}}/>}
     </div>
   )
 }

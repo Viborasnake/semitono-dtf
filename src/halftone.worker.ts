@@ -1,9 +1,6 @@
-import { halftone } from './halftone'
+import { processImage } from './process-image'
 import { resizeRgba, sharpenRgba } from './resample'
-import { autoAdjust } from './auto-adjust'
 import { neuralUpscaleRgba } from './neural-upscale'
-import { applyColorCorrection, flattenSelectedColor, removeSmallParticles, removeTinyDots, restoreProtectedPixels, smoothRgba } from './refine'
-import { applyEdgeMask } from './edge-mask'
 
 self.onmessage = async (event) => {
   try {
@@ -33,21 +30,9 @@ self.onmessage = async (event) => {
       resized = sharpenRgba(neural ? resizeRgba(neural, neuralWidth, neuralHeight, width, height, 'lanczos3') : resizeRgba(data, sourceWidth, sourceHeight, width, height, 'lanczos3'), width, height, settings.sharpness)
     }
     progress(76)
-    const corrected = event.data.colorCorrection ? applyColorCorrection(resized, event.data.colorCorrection, settings.flattenColorValue, 100) : resized
-    const flattened = settings.flattenColor ? flattenSelectedColor(corrected, settings.flattenColorValue, settings.flattenColorTolerance) : corrected
-    const softened = smoothRgba(flattened, width, height, settings.preSmooth ?? 0)
-    const result = halftone(autoAdjust(softened, settings), width, height, settings, softened, flattened)
-    for (let p = 0; p < result.protectedMask.length; p++) if (result.protectedMask[p]) {
-      const i = p * 4
-      result.data[i] = result.data[i + 1] = result.data[i + 2] = result.data[i + 3] = 0
-    }
-    removeTinyDots(result.data, width, height, settings.minDotSize ?? 0)
-    removeSmallParticles(result.data, width, height, settings.particleMinSize ?? 0)
-    restoreProtectedPixels(result.data, flattened, resized, result.protectedMask, settings.solidAlpha, settings.protectSmoothEdge !== false)
-    applyEdgeMask(result.data, width, height, {style:settings.edgeMask ?? 'none',sizeMm:settings.edgeMaskSizeMm ?? 5,dpi:settings.dpi,sides:settings.edgeSides,solidAlpha:settings.solidAlpha})
-    result.transparent = Math.round(result.data.reduce((count: number, _, index: number) => index % 4 === 3 && result.data[index] === 0 ? count + 1 : count, 0) / (width * height) * 100)
+    const result = processImage(resized,width,height,settings,event.data.colorCorrection,event.data.compareBackground)
     progress(96)
-    self.postMessage({...result, original: resized, warning, neuralScale: appliedNeuralScale}, { transfer: [result.data.buffer, resized.buffer] })
+    self.postMessage({...result, original: resized, warning, neuralScale: appliedNeuralScale}, { transfer: [result.data.buffer, resized.buffer,...(result.background?[result.background.buffer]:[])] })
   } catch (error) {
     self.postMessage({ error: error instanceof Error ? error.message : 'No se pudo procesar la imagen.' })
   }

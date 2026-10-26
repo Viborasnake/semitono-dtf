@@ -355,6 +355,8 @@ input[type=checkbox] { accent-color:var(--aqua); }
 .range-canvas-wrap canvas { display:block; max-width:100%; height:auto; }
 .range-source-wrap { max-height:420px; overflow:auto; align-items:flex-start; justify-content:flex-start; }
 .range-source-canvas { max-width:none !important; flex:0 0 auto; image-rendering:pixelated; }
+.color-range-modal .range-source-wrap canvas { max-width:none; flex:0 0 auto; image-rendering:pixelated; }
+.range-swatches>label { display:flex; align-items:center; gap:6px; font-size:12px; }
 .range-canvas-wrap canvas[aria-label] { cursor:crosshair; }
 .range-zoom { display:flex; align-items:center; justify-content:flex-end; gap:6px; color:#b8c9c3; font-size:12px; white-space:nowrap; }
 .range-zoom .btn { min-width:30px; min-height:30px; padding:4px 8px; }

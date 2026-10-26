@@ -1,4 +1,5 @@
 import {connectedWhiteBackground} from './white-background.ts'
+import {removeBackground} from './background-stage.ts'
 import {colorRangeRetention,defaultColorRange,selectionBrushMask,selectionCoverage,type ColorRange} from './color-range.ts'
 export type HalftoneSettings = {
   lpi: number; angle: number; shape: 'circle' | 'square' | 'line'; size: number
@@ -6,6 +7,10 @@ export type HalftoneSettings = {
   preserveColor: boolean; invert: boolean
   background: 'black' | 'white' | 'none' | 'custom'; tolerance: number
   screenScope?: 'transitions' | 'all'
+  separateBackground?: boolean
+  screenBase?: 'black'|'white'
+  /** Internal flag: background removal has already produced the input alpha. */
+  prepared?: boolean
   affectedColors?: ColorRange
   protectedColors?: ColorRange
   organic?: number
@@ -29,6 +34,10 @@ export type HalftoneSettings = {
 // Partial alpha uses four subpixel samples; solid alpha samples the pixel
 // center. Promoting ANY subpixel hit to opaque would dilate every dot.
 export function halftone(data: Uint8ClampedArray, width: number, height: number, s: HalftoneSettings, selectionSource=data, protectionSource=selectionSource) {
+  if(s.separateBackground){
+    const clean=removeBackground(data,width,height,s,selectionSource)
+    return halftone(clean,width,height,{...s,separateBackground:false,prepared:true,background:'none',screenScope:s.affectedColors?'all':s.screenScope},selectionSource,clean)
+  }
   const output = new Uint8ClampedArray(data.length)
   const protectedMask = new Uint8Array(width * height)
   const retain=s.background==='custom'?colorRangeRetention(s.colorRange??defaultColorRange):null
@@ -98,7 +107,7 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
     const protect = !!protection && colorDistance(protectionSource[i], protectionSource[i+1], protectionSource[i+2], protection[0], protection[1], protection[2]) <= protectionDistance && (!protectionNeutral || sourceSpread <= protectionNeutralSpread)
     const targetPeak = Math.max(...(protection ?? [0, 0, 0]))
     const protectionIsRemovedBackground = !!protection && ((processingBackground === 'black' && targetPeak <= s.tolerance * 2.55) || (processingBackground === 'white' && Math.min(...protection) >= s.whiteCutoff - 2.55))
-    if (protect && !protectionIsRemovedBackground) { protectedMask[y * width + x] = 1; continue }
+    if (!s.prepared && protect && !protectionIsRemovedBackground) { protectedMask[y * width + x] = 1; continue }
     let r = data[i] / 255, g = data[i + 1] / 255, b = data[i + 2] / 255
     const max = Math.max(r, g, b), min = Math.min(r, g, b)
     let coverage: number
@@ -159,7 +168,7 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
         const gainReduction=peak/(peak+(48/255-peak)*amount)
         r=1-(1-r)*gainReduction;g=1-(1-g)*gainReduction;b=1-(1-b)*gainReduction
       }
-    } else coverage = s.enabled === false || s.screenScope === 'transitions' ? 1 : 1 - (.2126 * r + .7152 * g + .0722 * b)
+    } else coverage = s.enabled === false || s.screenScope === 'transitions' ? 1 : s.prepared&&s.screenBase==='black' ? (.2126 * r + .7152 * g + .0722 * b) : 1 - (.2126 * r + .7152 * g + .0722 * b)
     if (solidBlack && coverage > 0 && coverage < .5) {
       let connected = false
       for (let oy = -1; oy <= 1 && !connected; oy++) for (let ox = -1; ox <= 1; ox++) {
@@ -174,17 +183,20 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
     const retainedCoverage=coverage*data[i+3]/255*edgeAlpha*colorAlpha
     const selectionAmount=affected?selectionCoverage(s.affectedColors!,affected(selectionSource[i],selectionSource[i+1],selectionSource[i+2]),affectedBrush?.[y*width+x]):1
     const protectionAmount=protectedColors?selectionCoverage(s.protectedColors!,protectedColors(selectionSource[i],selectionSource[i+1],selectionSource[i+2]),protectedBrush?.[y*width+x]):0
-    const screenAmount=selectionAmount*(1-protectionAmount)
-    coverage = clamp((coverage - .5) * s.contrast / 100 + .5 + (s.brightness - 100) / 100)
-    if (s.invert) coverage = 1 - coverage
-    coverage = Math.pow(coverage, 1 / (s.gamma ?? 1))
+    const screenAmount=selectionAmount*(1-Math.max(protectionAmount,s.prepared&&protect?1:0))
+    if(!(s.prepared&&s.enabled===false)){
+      coverage = clamp((coverage - .5) * s.contrast / 100 + .5 + (s.brightness - 100) / 100)
+      if (s.invert) coverage = 1 - coverage
+      coverage = Math.pow(coverage, 1 / (s.gamma ?? 1))
+    }
     coverage = clamp(coverage * (s.enabled === false ? 1 : (s.size / 100) ** 2)) * data[i + 3] / 255 * edgeAlpha * colorAlpha
     // Selection masks blend toward solid retained ink, without restoring any
     // pixels removed by the background mask. Protection wins on overlap.
-    if(s.enabled!==false&&screenAmount<1)coverage=coverage*screenAmount+(retainedCoverage>0?1:0)*(1-screenAmount)
+    if(s.enabled!==false&&screenAmount<1)coverage=coverage*screenAmount+(s.prepared?data[i+3]/255*edgeAlpha:retainedCoverage>0?1:0)*(1-screenAmount)
     const keepIsolatedSolid = isolatedTransition && colorAlpha >= .999 && data[i + 3] === 255 && edgeAlpha >= .999
-    let hits = s.enabled === false ? coverage * samples : keepIsolatedSolid ? samples : 0
-    if (s.enabled !== false && !keepIsolatedSolid) for (const oy of offsets) for (const ox of offsets) {
+    const continuousSelection=s.prepared&&screenAmount===0
+    let hits = s.enabled === false || continuousSelection ? coverage * samples : keepIsolatedSolid ? samples : 0
+    if (s.enabled !== false && !keepIsolatedSolid && !continuousSelection) for (const oy of offsets) for (const ox of offsets) {
       const rx = ((x + ox) * cos + (y + oy) * sin) / pitch
       const ry = (-(x + ox) * sin + (y + oy) * cos) / pitch
       const cellX=Math.floor(rx),cellY=Math.floor(ry)
@@ -195,7 +207,7 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
       if (coverage >= 1 || coverage > threshold) hits++
     }
     if (!hits) { transparent++; continue }
-    const mono = s.background === 'black' ? 255 : 0
+    const mono = (s.prepared?s.screenBase:s.background) === 'black' ? 255 : 0
     output[i] = s.preserveColor ? r * 255 : mono
     output[i + 1] = s.preserveColor ? g * 255 : mono
     output[i + 2] = s.preserveColor ? b * 255 : mono
