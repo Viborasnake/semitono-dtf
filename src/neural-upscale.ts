@@ -9,6 +9,13 @@ export function sourceIsNeutral(r: number, g: number, b: number) {
   return peak < 48 || peak - Math.min(r, g, b) <= 12
 }
 
+// Exported PNG artwork often uses 250-253 alpha across otherwise solid ink.
+// Treat it as opaque for colour reconstruction; reserve source-colour sampling
+// for the actual translucent cutout edge, where the model has no alpha output.
+export function useNeuralColor(alpha: number) {
+  return alpha >= 248
+}
+
 export function absoluteAssetUrl(path: string, assetOrigin: string) {
   if (/^https?:\/\//i.test(path)) return path
   if (!assetOrigin) throw new Error(`No se pudo resolver el recurso Neural: ${path}`)
@@ -119,7 +126,7 @@ async function runUpscale(
         const green = Math.max(0, Math.min(255, Math.round(values[plane + source] * 255)))
         const blue = Math.max(0, Math.min(255, Math.round(values[plane * 2 + source] * 255)))
         const edge=sampleUpscaledEdge(data,width,height,ox+dx,oy+dy,scale)
-        if(edge.a<254){
+        if(!useNeuralColor(edge.a)){
           output[target]=edge.r;output[target+1]=edge.g;output[target+2]=edge.b
         } else if (sourceIsNeutral(data[original], data[original + 1], data[original + 2])) {
           output[target] = output[target + 1] = output[target + 2] = Math.round((red + green + blue) / 3)

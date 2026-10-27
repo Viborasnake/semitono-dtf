@@ -1,6 +1,6 @@
 import {test} from 'node:test'
 import assert from 'node:assert/strict'
-import {absoluteAssetUrl,paddedTileSize,sampleUpscaledEdge,sourceIsNeutral} from './neural-upscale.ts'
+import {absoluteAssetUrl,paddedTileSize,sampleUpscaledEdge,sourceIsNeutral,useNeuralColor} from './neural-upscale.ts'
 
 test('resolves Neural assets to absolute GitHub Pages URLs for workers',()=>{
   assert.equal(
@@ -40,4 +40,9 @@ test('neural output gets smooth alpha and uncontaminated source colour at cutout
     assert.equal(Math.round(pixel.b),160)
   }
   assert.equal(samples.at(-1)!.a,0)
+})
+
+test('near-opaque PNG ink uses Neural while translucent cutout edges retain source colour',()=>{
+  for(const alpha of [248,250,251,252,253,254,255])assert.equal(useNeuralColor(alpha),true)
+  for(const alpha of [0,1,128,240,247])assert.equal(useNeuralColor(alpha),false)
 })
