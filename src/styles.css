@@ -81,9 +81,6 @@ input[type='range']::-webkit-slider-thumb { width: 13px; height: 13px; appearanc
 .stage { position:relative; grid-template-rows:auto minmax(0,1fr) 44px; }
 .stage-toolbar .preview-background { position:static; font-size:11px; gap:6px; }
 .stage-toolbar .upload-mini { position:static; margin-left:auto; }
-.stage-image-actions { display:flex; align-items:center; gap:8px; margin-left:auto; }
-.stage-image-actions .upload-mini { margin-left:0; }
-.stage-image-actions .gang-send { border-color:#53e6ca; color:#061410; background:var(--aqua); box-shadow:0 0 20px rgba(41,226,194,.12); }
 .stage .canvas-area { padding-top:24px; }
 .view-controls { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .view-switch, .comparison-switch { display: flex; align-items:center; padding: 3px; border: 1px solid #2a2e34; border-radius: 8px; background: #0a0c0e; }
@@ -492,6 +489,24 @@ input[type=checkbox] { accent-color:var(--aqua); }
 .app-shell > .workspace, .app-shell > .gang-container { flex:1; min-height:0; height:auto; }
 .gang-container > .workspace { height:100%; }
 .top-actions { justify-content:flex-end; }
+.top-actions { align-items:center; }
+.top-actions .top-change-image,
+.top-actions .top-gang-send { height:40px; white-space:nowrap; }
+.top-actions .top-change-image { border-color:var(--ds-border-control); }
+.top-actions .top-gang-send {
+  border-color:var(--ds-pink);
+  background:var(--ds-black);
+  box-shadow:0 4px 0 var(--ds-pink);
+  color:#fff;
+}
+.top-actions .top-gang-send:not(:disabled):hover {
+  border-color:var(--ds-lime);
+  background:var(--ds-lime);
+  box-shadow:0 6px 0 #9eb445;
+  color:var(--ds-ink);
+  transform:translateY(-2px);
+}
+.top-actions .top-gang-send:disabled { box-shadow:0 3px 0 #3f413a; }
 .project-toolbar { display:flex; flex:none; align-items:center; flex-wrap:wrap; gap:8px; padding:8px 20px; border-bottom:1px solid var(--line); background:#101416; }
 .project-toolbar-label { font-size:11px; font-weight:600; color:#93a29c; margin-right:6px; }
 .project-toolbar .btn { height:32px; font-size:11px; }
@@ -501,10 +516,15 @@ input[type=checkbox] { accent-color:var(--aqua); }
 .project-toolbar .reset-adjustments { margin-left:auto; }
 @media (max-width:800px) {
   .app-shell > .topbar { padding:10px 12px; gap:12px; grid-template-columns:auto minmax(0,1fr); position:static; }
-  .topbar .top-actions { grid-column:1/-1; }
+  .topbar .top-actions { grid-column:1/-1; width:100%; }
   .project-toolbar { padding:8px 12px; }
   .project-toolbar-label { display:none; }
   .project-toolbar .reset-adjustments { margin-left:0; }
+}
+@media (max-width:600px) {
+  .top-actions .btn { width:40px; min-width:40px; padding:0; justify-content:center; }
+  .top-actions .btn span { display:none; }
+  .top-actions .export-trigger { min-width:40px; }
 }
 .stage-toolbar { justify-content:flex-start; gap:8px; padding:10px 12px; }
 .stage-toolbar .btn, .stage-toolbar .upload-mini,
@@ -661,26 +681,23 @@ input[type='range']::-webkit-slider-thumb {
   color: #fff;
 }
 .btn:not(:disabled):active { transform: translateY(2px); }
-.btn.export,
-.stage-image-actions .gang-send {
+.btn.export {
   border-color: var(--ds-pink);
   background: var(--ds-pink);
   color: var(--ds-ink);
   box-shadow: 0 4px 0 var(--ds-pink-shadow);
   font-weight: 800;
 }
-.btn.export:not(:disabled):hover,
-.stage-image-actions .gang-send:not(:disabled):hover {
+.btn.export:not(:disabled):hover {
   border-color: var(--ds-lime);
   background: var(--ds-lime);
   color: var(--ds-ink);
   box-shadow: 0 6px 0 #9eb445;
   transform: translateY(-2px);
 }
-.btn.export:not(:disabled):active,
-.stage-image-actions .gang-send:not(:disabled):active { box-shadow: 0 1px 0 var(--ds-pink-shadow); transform: translateY(3px); }
+.btn.export:not(:disabled):active { box-shadow: 0 1px 0 var(--ds-pink-shadow); transform: translateY(3px); }
 .btn:disabled { border-color: #3f413a; background: #20211d; color: #73756d; opacity: 1; }
-.btn.export:disabled, .stage-image-actions .gang-send:disabled { box-shadow: 0 3px 0 #3f413a; }
+.btn.export:disabled { box-shadow: 0 3px 0 #3f413a; }
 .btn.danger, .project-toolbar .project-delete { border-color: #7d4842; color: #ffb9b2; }
 .btn.danger:not(:disabled):hover, .project-toolbar .project-delete:not(:disabled):hover { border-color: #d7645a; background: #381c19; }
 

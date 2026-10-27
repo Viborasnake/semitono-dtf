@@ -960,6 +960,8 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
         </div>
         <div className="top-actions">
           {fileName && tool === 'design' && <>
+            <button type="button" className="btn top-change-image" onClick={() => fileInput.current?.click()}><Upload size={16} aria-hidden="true"/><span>Cambiar imagen</span></button>
+            <button type="button" className="btn top-gang-send" title="Revisar la seguridad de la trama y añadir el diseño a la plancha" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={reviewBeforeGang}><Layers3 size={16} aria-hidden="true"/><span>{editingAssetId?'Revisar y actualizar Gang Sheet':'Revisar y enviar a Gang Sheet'}</span></button>
             <div className="export-dropdown" ref={exportMenuRef}>
               <button type="button" className="btn export export-trigger" aria-expanded={exportMenuOpen} aria-haspopup="menu" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={() => setExportMenuOpen(value => !value)}><Download size={17} /> <span>{exporting ? 'Exportando…' : 'Exportar'}</span><ChevronDown size={15} /></button>
               {exportMenuOpen && <div className="export-menu" role="menu">
@@ -1259,10 +1261,6 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
                 <option value="#3b2418">Café oscuro · oscuro</option>
               </optgroup>
             </select></div>
-            <div className="stage-image-actions">
-              <button className="upload-mini" onClick={() => fileInput.current?.click()}><Upload size={15} /> Cambiar imagen</button>
-              <button className="btn gang-send" title="Revisar la seguridad de la trama y añadir el diseño a la plancha" disabled={processing || exporting || !output || readyKey !== renderKey} onClick={reviewBeforeGang}><Layers3 size={16}/><span>{editingAssetId?'Revisar y actualizar Gang Sheet':'Revisar y enviar a Gang Sheet'}</span></button>
-            </div>
             <input ref={fileInput} hidden type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={(e) => { requestImport(e.target.files?.[0]); e.target.value='' }} />
           </div>
           {processing && <div className="processing stage-processing" role="status" aria-live="polite">
