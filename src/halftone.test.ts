@@ -41,6 +41,14 @@ test('white detail and saturated red survive black removal', () => {
     assert.deepEqual(Array.from(result.data.slice(0,4)), [...rgb,255])
   }
 })
+test('screened transparent artwork keeps saturated ink solid on its substrate', () => {
+  const red=image(255,25,18)
+  const result=halftone(red,64,64,{...settings,background:'none',prepared:true,screenBase:'black',solidAlpha:true})
+  assert.equal(result.transparent,0)
+  assert.deepEqual(Array.from(result.data.slice(0,4)),[255,25,18,255])
+  const gray=halftone(image(128,128,128),64,64,{...settings,background:'none',prepared:true,screenBase:'black',solidAlpha:true})
+  assert.ok(gray.transparent>10&&gray.transparent<90)
+})
 test('midtones contain holes and unmatted bright ink', () => {
   const result = halftone(image(110,110,110), 64, 64, settings)
   assert.ok(result.transparent > 10 && result.transparent < 90)

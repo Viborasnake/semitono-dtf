@@ -169,7 +169,9 @@ export function halftone(data: Uint8ClampedArray, width: number, height: number,
         const gainReduction=peak/(peak+(48/255-peak)*amount)
         r=1-(1-r)*gainReduction;g=1-(1-g)*gainReduction;b=1-(1-b)*gainReduction
       }
-    } else coverage = s.enabled === false || s.screenScope === 'transitions' ? 1 : s.prepared&&s.screenBase==='black' ? (.2126 * r + .7152 * g + .0722 * b) : 1 - (.2126 * r + .7152 * g + .0722 * b)
+    } else coverage = s.enabled === false || s.screenScope === 'transitions' ? 1
+      : s.prepared && s.screenBase === 'black' ? max
+        : 1 - (.2126 * r + .7152 * g + .0722 * b)
     if (solidBlack && coverage > 0 && coverage < .5) {
       let connected = false
       for (let oy = -1; oy <= 1 && !connected; oy++) for (let ox = -1; ox <= 1; ox++) {
