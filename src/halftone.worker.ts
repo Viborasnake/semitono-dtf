@@ -8,6 +8,7 @@ self.onmessage = async (event) => {
     const progress = (value: number) => self.postMessage({ type: 'progress', progress: value })
     progress(8)
     let resized: Uint8ClampedArray
+    let lanczosComparison: Uint8ClampedArray | undefined
     let appliedNeuralScale = event.data.preprocessed ? (event.data.preprocessedNeuralScale ?? 1) : 1
     let warning: string | undefined
     if (preprocessed) {
@@ -32,11 +33,12 @@ self.onmessage = async (event) => {
       const neuralWidth = sourceWidth * neuralScale, neuralHeight = sourceHeight * neuralScale
       const fallbackMethod=neuralRequested?'lanczos3':settings.resampleMethod
       resized = sharpenRgba(neural ? resizeRgba(neural, neuralWidth, neuralHeight, width, height, 'lanczos3') : resizeRgba(data, sourceWidth, sourceHeight, width, height, fallbackMethod), width, height, settings.sharpness)
+      if (neural) lanczosComparison = sharpenRgba(resizeRgba(data, sourceWidth, sourceHeight, width, height, 'lanczos3'), width, height, settings.sharpness)
     }
     progress(76)
     const result = processImage(resized,width,height,settings,event.data.colorCorrection,event.data.compareBackground)
     progress(96)
-    self.postMessage({...result, original: resized, warning, neuralScale: appliedNeuralScale}, { transfer: [result.data.buffer, resized.buffer,...(result.background?[result.background.buffer]:[])] })
+    self.postMessage({...result, original: resized, lanczosComparison, warning, neuralScale: appliedNeuralScale}, { transfer: [result.data.buffer, resized.buffer,...(lanczosComparison?[lanczosComparison.buffer]:[]),...(result.background?[result.background.buffer]:[])] })
   } catch (error) {
     self.postMessage({ error: error instanceof Error ? error.message : 'No se pudo procesar la imagen.' })
   }

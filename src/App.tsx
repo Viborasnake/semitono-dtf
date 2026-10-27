@@ -200,6 +200,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
   const [projectCollapsed,setProjectCollapsed]=useState(true)
   const sourceCanvas = useRef<HTMLCanvasElement>(null)
   const originalCanvas = useRef<HTMLCanvasElement>(null)
+  const lanczosCanvas = useRef<HTMLCanvasElement>(null)
   const resultCanvas = useRef<HTMLCanvasElement>(null)
   const fileInput = useRef<HTMLInputElement>(null)
   const imageRef = useRef<HTMLImageElement | null>(null)
@@ -637,6 +638,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
     : settings.resampleMethod === 'lanczos3' ? 'Lanczos-3'
       : settings.resampleMethod === 'bicubic' ? 'Bicúbico'
         : settings.resampleMethod === 'bilinear' ? 'Bilineal' : 'Vecino más cercano'
+  const compareNeuralToLanczos = comparisonTarget === 'rescale' && appliedNeuralScale > 1 && !!lanczosCanvas.current?.width
   const selectComparison = (target:ComparisonTarget) => {
     setComparisonTarget(target)
     setView('split')
@@ -718,6 +720,13 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             // Resize only when the replacement is ready: resizing clears canvas pixels.
             const originalPixels=new ImageData(data.original,width,height)
             const resultPixels=new ImageData(data.data,width,height)
+            if(data.lanczosComparison){
+              const baseline=lanczosCanvas.current!
+              baseline.width=width;baseline.height=height
+              baseline.getContext('2d')!.putImageData(new ImageData(data.lanczosComparison,width,height),0,0)
+            } else if ((data.neuralScale ?? 1) === 1 && lanczosCanvas.current) {
+              lanczosCanvas.current.width=lanczosCanvas.current.height=0
+            }
             if(data.background){original.width=width;original.height=height;original.getContext('2d')!.putImageData(new ImageData(data.background,width,height),0,0)}
             resizedCache.current={key:resizeKey,data:new Uint8ClampedArray(data.original),width,height,neuralScale:data.neuralScale ?? 1}
             setAppliedNeuralScale(data.neuralScale ?? 1)
@@ -1014,14 +1023,14 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
             <label className="field">Resolución<select aria-label="Resolución de impresión" value={dpi} onChange={e => setDpi(Number(e.target.value))}><option value="150">150 ppp</option><option value="300">300 ppp</option><option value="600">600 ppp</option></select></label>
             <p className="help-text">Salida PNG sRGB, 8 bits por canal. Comprueba los ppp requeridos por tu RIP. Aumentarlos no recupera detalle del original.</p>
             <p className="help-text">Proporciones bloqueadas.</p>
-            <label className="field">Método de reescalado<select aria-label="Método de reescalado" value={settings.resampleMethod} onChange={e => update('resampleMethod', e.target.value as ResizeMethod)}><option value="lanczos3">Lanczos-3 · fotos y detalle</option><option value="bicubic">Bicúbico · fotos suaves</option><option value="bilinear">Bilineal · rapidez</option><option value="nearest">Vecino más cercano · pixel art</option><option value="neural2">Neural x2 · experimental</option><option value="neural4">Neural x4 · experimental</option></select></label>
+            <label className="field">Método de reescalado<select aria-label="Método de reescalado" value={settings.resampleMethod} onChange={e => {const method=e.target.value as ResizeMethod;update('resampleMethod',method);if(method==='neural2'||method==='neural4')selectComparison('rescale')}}><option value="lanczos3">Lanczos-3 · fotos y detalle</option><option value="bicubic">Bicúbico · fotos suaves</option><option value="bilinear">Bilineal · rapidez</option><option value="nearest">Vecino más cercano · pixel art</option><option value="neural2">Neural x2 · experimental</option><option value="neural4">Neural x4 · experimental</option></select></label>
             <p className="help-text">{({lanczos3:'Recomendado para fotografías y ampliaciones con mucho detalle. Es el método más definido, pero puede marcar más los bordes.',bicubic:'Recomendado para fotografías cuando buscas un resultado más suave y con menos riesgo de halos.',bilinear:'Recomendado para previsualizaciones rápidas o ampliaciones moderadas. Suaviza más y conserva menos detalle fino.',nearest:'Recomendado para pixel art, gráficos con píxeles intencionales o formas muy duras. No usar para fotografías.',neural2:'Real-ESRGAN x2 en tu equipo. Procesa también imágenes grandes por bloques; el tiempo depende del tamaño y de la aceleración disponible.',neural4:'Real-ESRGAN x4 en tu equipo. Procesa también imágenes grandes por bloques. Requiere más tiempo y memoria; revisa el detalle generado al 100%.'} as Record<ResizeMethod,string>)[settings.resampleMethod]}</p>
             {resizeInfo && <div className="resize-summary" role="status">
               <strong>Reescalado activo</strong>
               <span>Original: {resizeInfo.sourceWidth.toLocaleString()} × {resizeInfo.sourceHeight.toLocaleString()} px</span>
               <span>Salida: {resizeInfo.outputWidth.toLocaleString()} × {resizeInfo.outputHeight.toLocaleString()} px · {resizeInfo.percent.toFixed(1)}%</span>
               <span>Método: {({lanczos3:'Lanczos-3',bicubic:'Bicúbico',bilinear:'Bilineal',nearest:'Vecino más cercano',neural2:'Neural x2 experimental',neural4:'Neural x4 experimental'} as Record<ResizeMethod,string>)[settings.resampleMethod]} · Se aplica antes del semitono</span>
-              {(settings.resampleMethod==='neural2'||settings.resampleMethod==='neural4')&&<span>{processing?'Neural: procesando modelo…':readyKey===renderKey?(appliedNeuralScale>1?`Neural ×${appliedNeuralScale}: aplicado y visible en la comparación Reescalado.`:`Neural: ${exportMessage||'no se aplicó; se usó Lanczos-3.'}`):'Neural: esperando actualización.'}</span>}
+              {(settings.resampleMethod==='neural2'||settings.resampleMethod==='neural4')&&<span>{processing?'Neural: procesando modelo…':readyKey===renderKey?(appliedNeuralScale>1?`Neural ×${appliedNeuralScale}: aplicado. Compáralo directamente con Lanczos-3 en Reescalado al 100%.`:`Neural: ${exportMessage||'no se aplicó; se usó Lanczos-3.'}`):'Neural: esperando actualización.'}</span>}
             </div>}
             <p className="help-text">La ampliación aumenta los píxeles de salida, pero no recupera detalle que no exista en el original.</p>
             <RangeControl label="Nitidez post-reescalado" value={settings.sharpness} min={0} max={100} unit="%" onChange={v => update('sharpness', v)} />
@@ -1190,7 +1199,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               <div className="comparison-switch" role="group" aria-label="Contenido de la comparación">
                 <span>Comparar:</span>
                 <button type="button" className={comparisonTarget==='result'?'active':''} disabled={!output||processing} aria-pressed={comparisonTarget==='result'} onClick={()=>selectComparison('result')}>Resultado final</button>
-                <button type="button" className={comparisonTarget === 'rescale' ? 'active' : ''} aria-label="Comparar original sin reescalar y reescalado" title="Abre al 100% para revisar el detalle generado por el método de reescalado" aria-pressed={comparisonTarget === 'rescale'} disabled={!output || processing} onClick={() => selectComparison('rescale')}><Layers3 size={15} /> Reescalado</button>
+                <button type="button" className={comparisonTarget === 'rescale' ? 'active' : ''} aria-label={appliedNeuralScale>1?'Comparar Lanczos-3 y Neural':'Comparar original sin reescalar y reescalado'} title="Abre al 100% para revisar el detalle generado por el método de reescalado" aria-pressed={comparisonTarget === 'rescale'} disabled={!output || processing} onClick={() => selectComparison('rescale')}><Layers3 size={15} /> Reescalado</button>
                 <button type="button" className={comparisonTarget==='background'?'active':''} disabled={!output||processing} aria-pressed={comparisonTarget==='background'} onClick={()=>selectComparison('background')}>Fondo / trama</button>
               </div>
             </div>
@@ -1254,19 +1263,20 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
           <div className={`canvas-area ${handActive ? 'hand-active' : ''} ${panning ? 'is-panning' : ''} ${(brushTool || colorBrushTool || pickColorTool) ? 'brush-active' : ''} ${pickColorTool ? 'color-picker-active' : ''}`} ref={viewportRef} onPointerDownCapture={startPan} onPointerDown={e=>{pickOriginalColor(e);startColorBrush(e);startBrush(e)}} onPointerMove={e=>{movePan(e);moveColorBrush(e);moveBrush(e)}} onPointerLeave={()=>setBrushCursor(null)} onPointerUp={e=>{stopPan(e);stopColorBrush(e);stopBrush(e)}} onPointerCancel={e=>{stopPan(e);stopColorBrush(e);stopBrush(e)}} onLostPointerCapture={e=>{stopPan(e);stopColorBrush(e);stopBrush(e)}}>
             {!fileName && <div className="start-upload"><Upload size={36}/><h2>{readyForNewImage?'Listo para otro diseño':'Arrastra tu imagen aquí'}</h2><p>{readyForNewImage?'Carga una nueva imagen para continuar':'PNG, JPG, WebP o SVG'}</p><button className="btn export" disabled={loading} onClick={()=>fileInput.current?.click()}>{loading?'Abriendo imagen…':readyForNewImage?'Cargar nueva imagen':'Abrir imagen'}</button>{error && <p className="error-text" role="alert">{error}</p>}</div>}
             <div className="artboard" hidden={!fileName} style={{ width: Math.max(1, visibleSize.width * previewScale), height: Math.max(1, visibleSize.height * previewScale), aspectRatio: `${visibleSize.width} / ${visibleSize.height}`, ...(previewBg !== 'checker' ? { backgroundImage: 'none', backgroundColor: previewBg } : {}) }}>
-              <canvas ref={originalCanvas} className="art-canvas" style={{ clipPath: view === 'split' ? `inset(0 ${100 - split}% 0 0)` : 'none', visibility: view === 'result' ? 'hidden' : 'visible' }} />
+              <canvas ref={originalCanvas} className="art-canvas" style={{ clipPath: view === 'split' ? `inset(0 ${100 - split}% 0 0)` : 'none', visibility: view === 'result' || (view === 'split' && compareNeuralToLanczos) ? 'hidden' : 'visible' }} />
+              <canvas ref={lanczosCanvas} className="art-canvas" style={{ clipPath: view === 'split' ? `inset(0 ${100 - split}% 0 0)` : 'none', visibility: view === 'split' && compareNeuralToLanczos ? 'visible' : 'hidden' }} />
               <div className="result-layer" style={{ clipPath: view === 'split' ? `inset(0 0 0 ${split}%)` : 'none', visibility: view === 'original' ? 'hidden' : 'visible' }}>
                 <canvas ref={sourceCanvas} className="art-canvas" style={{visibility: comparisonTarget === 'rescale' ? 'visible' : 'hidden'}} />
                 <canvas ref={resultCanvas} className="art-canvas" style={{visibility: comparisonTarget !== 'rescale' ? 'visible' : 'hidden'}} />
               </div>
               {(brushTool || colorBrushTool || pickColorTool) && brushCursor && resultCanvas.current && <div className={`brush-cursor ${pickColorTool ? 'color-picker-cursor' : ''}`} style={{left: brushCursor.x, top: brushCursor.y, width: pickColorTool ? 18 : brushSize * resultCanvas.current.getBoundingClientRect().width / resultCanvas.current.width, height: pickColorTool ? 18 : brushSize * resultCanvas.current.getBoundingClientRect().height / resultCanvas.current.height}} aria-hidden="true" />}
               {view === 'split' && <div className="comparison-labels" aria-hidden="true">
-                <span className="comparison-label-left">{comparisonTarget==='rescale'?`Original · ${resizeInfo?.sourceWidth.toLocaleString()} × ${resizeInfo?.sourceHeight.toLocaleString()} px`:comparisonTarget==='background'?'Fondo eliminado':'Original'}</span>
+                <span className="comparison-label-left">{comparisonTarget==='rescale'?(compareNeuralToLanczos?`Lanczos-3 · ${resizeInfo?.outputWidth.toLocaleString()} × ${resizeInfo?.outputHeight.toLocaleString()} px`:`Original · ${resizeInfo?.sourceWidth.toLocaleString()} × ${resizeInfo?.sourceHeight.toLocaleString()} px`):comparisonTarget==='background'?'Fondo eliminado':'Original'}</span>
                 <span className="comparison-label-right">{comparisonTarget==='rescale'?`${rescaleMethodLabel} · ${resizeInfo?.outputWidth.toLocaleString()} × ${resizeInfo?.outputHeight.toLocaleString()} px`:comparisonTarget==='background'?'Con trama':'Resultado final'}</span>
               </div>}
               {view === 'split' && <><div className="split-line" style={{ left: `${split}%` }}><span><Minus /><Minus /></span></div>{!brushTool && !colorBrushTool && !pickColorTool && <input className="split-input" aria-label="Divisor de comparación" type="range" min="0" max="100" value={split} onChange={(e) => setSplit(Number(e.target.value))} />}</>}
             </div>
-            {fileName&&comparisonTarget==='rescale'&&view==='split'&&<p className="rescale-compare-hint">Vista al 100% · arrastra el divisor para comparar el detalle antes y después del reescalado.</p>}
+            {fileName&&comparisonTarget==='rescale'&&view==='split'&&<p className="rescale-compare-hint">Vista al 100% · arrastra el divisor para comparar {compareNeuralToLanczos?'Lanczos-3 y Neural':'el original y el reescalado'}.</p>}
             {dragging && <div className="drop-overlay"><Upload size={32} /><b>Suelta tu imagen aquí</b><span>PNG, JPG, WebP o SVG</span></div>}
           </div>
 
