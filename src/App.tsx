@@ -948,7 +948,7 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
       else if(e.key.toLowerCase()==='y'){e.preventDefault();navigateHistory('redo')}
     }}>
       <header className="topbar">
-        <div className="brand"><div className="brand-mark"><CircleDot size={23} /><i /></div><span>TRAMA</span><small>DTF LAB</small></div>
+        <div className="brand" aria-label="Droska Trama DTF"><span className="brand-word">droska</span><small>TRAMA DTF</small></div>
         <div className={`project-status ${projectStatus.failed?'save-failed':''}`}>
           <button type="button" className="project-disclosure" aria-expanded={!projectCollapsed} aria-controls="project-details project-actions" aria-label={projectCollapsed?'Mostrar detalles y acciones del proyecto':'Ocultar detalles y acciones del proyecto'} onClick={()=>setProjectCollapsed(value=>!value)}><strong title={`${projectStatus.name}.trama.json`}>{projectStatus.name}.trama.json</strong><ChevronDown size={16} aria-hidden="true"/></button>
           <span role="status">{projectStatus.message}</span>
@@ -1392,7 +1392,7 @@ export default function ProjectSession() {
   }
   if(project)return <App key={session} initialProject={project} resetting={resetting} onNewProject={()=>{void newProject()}}/>
   return <main className="project-start"><section className="project-start-card">
-    <span className="eyebrow">TRAMA · DTF LAB</span><h1>{checking?'Buscando tu proyecto…':'Nombra tu proyecto'}</h1>
+    <span className="eyebrow">DROSKA · TRAMA DTF</span><h1>{checking?'Buscando tu proyecto…':'Nombra tu proyecto'}</h1>
     <p>Un nombre para guardar y continuar tu trabajo.</p>
     {!checking&&<><form onSubmit={e=>{e.preventDefault();void start()}}>
       <label className="field">Nombre del archivo<input autoFocus aria-label="Nombre del archivo de proyecto" maxLength={80} placeholder="Ej. Poleras septiembre" value={name} onChange={e=>setName(e.target.value)}/></label>

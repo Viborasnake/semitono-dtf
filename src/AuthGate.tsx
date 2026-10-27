@@ -17,7 +17,7 @@ export default function AuthGate({children}:{children:ReactNode}) {
     finally{setBusy(false)}
   }
   return <main className="auth-page"><section className="auth-card" aria-labelledby="auth-title">
-    <span className="eyebrow">TRAMA · DTF LAB</span>
+    <span className="eyebrow">DROSKA · TRAMA DTF</span>
     <h1 id="auth-title">Acceso privado</h1>
     <p>Ingresa tus credenciales para continuar.</p>
     <form onSubmit={submit}>
