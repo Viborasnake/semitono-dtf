@@ -1082,7 +1082,12 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               <button className="text-button" onClick={()=>{setSettings(s=>({...s,affectedColors:undefined,protectedColors:undefined,protectSolid:false,screenScope:'all',size:100,contrast:100,brightness:100,gamma:1,invert:false,organic:0}));setPreset('custom');setView('result');setComparisonTarget('result')}}>Reiniciar selección y tono de trama</button>
               <RangeControl label="Irregularidad de los puntos" value={settings.organic??0} min={0} max={100} unit="%" onChange={v=>update('organic',v)}/>
               <p className="help-text">0%: trama regular. Aumenta para desplazar suavemente los puntos y reducir la apariencia de rejilla. Revisa los detalles al 100%.</p>
-              <RangeControl label="Frecuencia" value={settings.lpi} min={12} max={65} unit=" LPI" onChange={(v) => update('lpi', v)} />
+              <div className="lpi-control">
+                <RangeControl label="Frecuencia" value={settings.lpi} min={12} max={65} unit=" LPI" onChange={(v) => update('lpi', v)} />
+                <div className="lpi-anchors" role="group" aria-label="Frecuencias LPI habituales">
+                  {[20,24,28,32,45].map(lpi=><button key={lpi} type="button" className={settings.lpi===lpi?'active':''} aria-label={`Elegir ${lpi} LPI`} aria-pressed={settings.lpi===lpi} onClick={()=>update('lpi',lpi)}>{lpi}</button>)}
+                </div>
+              </div>
               <RangeControl label="Ángulo" value={settings.angle} min={0} max={90} step={0.5} unit="°" onChange={(v) => update('angle', v)} />
               <div className="field"><span>Forma del punto</span><div className="segmented shapes">
                 {(['circle', 'square', 'line'] as Shape[]).map((shape) => <button key={shape} className={settings.shape === shape ? 'active' : ''} onClick={() => update('shape', shape)}><i className={`shape-${shape}`} />{shapeLabels[shape]}</button>)}
