@@ -173,6 +173,12 @@ function RangeControl({ label, value, min, max, step = 1, unit = '', onChange }:
   )
 }
 
+function RangeAnchors({label,value,unit,values,onChange}:{label:string;value:number;unit:string;values:readonly number[];onChange:(v:number)=>void}){
+  return <div className="range-anchors" role="group" aria-label={`Anclas de ${label.toLowerCase()}`}>
+    {values.map(option=><button key={option} type="button" className={value===option?'active':''} aria-label={`Elegir ${option}${unit}`} aria-pressed={value===option} onClick={()=>onChange(option)}>{option}</button>)}
+  </div>
+}
+
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return <button type="button" className={`toggle ${checked ? 'on' : ''}`} aria-pressed={checked} onClick={() => onChange(!checked)}><span /></button>
 }
@@ -1082,17 +1088,21 @@ function App({onNewProject,initialProject,resetting=false}:{onNewProject:()=>voi
               <button className="text-button" onClick={()=>{setSettings(s=>({...s,affectedColors:undefined,protectedColors:undefined,protectSolid:false,screenScope:'all',size:100,contrast:100,brightness:100,gamma:1,invert:false,organic:0}));setPreset('custom');setView('result');setComparisonTarget('result')}}>Reiniciar selección y tono de trama</button>
               <RangeControl label="Irregularidad de los puntos" value={settings.organic??0} min={0} max={100} unit="%" onChange={v=>update('organic',v)}/>
               <p className="help-text">0%: trama regular. Aumenta para desplazar suavemente los puntos y reducir la apariencia de rejilla. Revisa los detalles al 100%.</p>
-              <div className="lpi-control">
+              <div className="range-setting">
                 <RangeControl label="Frecuencia" value={settings.lpi} min={12} max={65} unit=" LPI" onChange={(v) => update('lpi', v)} />
-                <div className="lpi-anchors" role="group" aria-label="Frecuencias LPI habituales">
-                  {[20,24,28,32,45].map(lpi=><button key={lpi} type="button" className={settings.lpi===lpi?'active':''} aria-label={`Elegir ${lpi} LPI`} aria-pressed={settings.lpi===lpi} onClick={()=>update('lpi',lpi)}>{lpi}</button>)}
-                </div>
+                <RangeAnchors label="Frecuencia" value={settings.lpi} unit=" LPI" values={[20,24,28,32,45]} onChange={v=>update('lpi',v)}/>
               </div>
-              <RangeControl label="Ángulo" value={settings.angle} min={0} max={90} step={0.5} unit="°" onChange={(v) => update('angle', v)} />
+              <div className="range-setting">
+                <RangeControl label="Ángulo" value={settings.angle} min={0} max={90} step={0.5} unit="°" onChange={(v) => update('angle', v)} />
+                <RangeAnchors label="Ángulo" value={settings.angle} unit="°" values={[0,15,22.5,30,45]} onChange={v=>update('angle',v)}/>
+              </div>
               <div className="field"><span>Forma del punto</span><div className="segmented shapes">
                 {(['circle', 'square', 'line'] as Shape[]).map((shape) => <button key={shape} className={settings.shape === shape ? 'active' : ''} onClick={() => update('shape', shape)}><i className={`shape-${shape}`} />{shapeLabels[shape]}</button>)}
               </div></div>
-              <RangeControl label="Tamaño máximo" value={settings.size} min={45} max={125} unit="%" onChange={(v) => update('size', v)} />
+              <div className="range-setting">
+                <RangeControl label="Tamaño máximo" value={settings.size} min={45} max={125} unit="%" onChange={(v) => update('size', v)} />
+                <RangeAnchors label="Tamaño máximo" value={settings.size} unit="%" values={[75,85,90,100,110]} onChange={v=>update('size',v)}/>
+              </div>
               <div className="row-label"><span>Alfa sólido (DTF)</span><Toggle checked={settings.solidAlpha} onChange={v => update('solidAlpha', v)} /></div>
               <p className="help-text">Cada punto exportado es opaco; los huecos permanecen transparentes. Desactívalo para conservar alfa parcial en los bordes.</p>
               <div className="row-label"><span>Conservar color</span><Toggle checked={settings.preserveColor} onChange={(v) => update('preserveColor', v)} /></div>

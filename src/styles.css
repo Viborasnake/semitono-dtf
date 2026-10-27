@@ -57,11 +57,11 @@ button { color: inherit; }
 .range-control > span { display: flex; align-items: center; justify-content: space-between; color: #8a9197; font-size: 11px; }
 .range-control b { color: #cdd1d4; font-weight: 500; }
 .range-control output { color: var(--aqua); font-size: 11px; font-weight: 600; }
-.lpi-control { display:grid; gap:9px; min-width:0; }
-.lpi-anchors { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:4px; }
-.lpi-anchors button { min-width:0; min-height:27px; padding:3px 0; border:1px solid #35413d; border-radius:6px; color:#aab7b1; background:#111719; font-size:10px; font-weight:600; cursor:pointer; }
-.lpi-anchors button:hover { border-color:#61bfae; color:#e1faf4; }
-.lpi-anchors button.active { border-color:#49d8be; color:#092019; background:var(--aqua); }
+.range-setting { display:grid; gap:9px; min-width:0; }
+.range-anchors { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:4px; }
+.range-anchors button { min-width:0; min-height:27px; padding:3px 0; border:1px solid #35413d; border-radius:6px; color:#aab7b1; background:#111719; font-size:10px; font-weight:600; cursor:pointer; }
+.range-anchors button:hover { border-color:#61bfae; color:#e1faf4; }
+.range-anchors button.active { border-color:#49d8be; color:#092019; background:var(--aqua); }
 input[type='range'] { --progress: 50%; width: 100%; height: 3px; appearance: none; border-radius: 5px; background: linear-gradient(to right, var(--aqua) 0 var(--progress), #353a40 var(--progress) 100%); cursor: pointer; }
 input[type='range']::-webkit-slider-thumb { width: 13px; height: 13px; appearance: none; border: 2px solid #09100e; border-radius: 50%; background: var(--aqua); box-shadow: 0 0 0 1px #49e4c8; }
 .field { display: grid; gap: 9px; color: #cdd1d4; font-size: 11px; }
